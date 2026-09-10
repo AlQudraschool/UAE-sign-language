@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>UAE Sign Language Recognition</title>
+  <meta name="description" content="Multi-mode sign language recognition: ASL, Arabic Sign Language, Essential Needs, and UAE Etiquette gestures -- runs right in your phone's browser." />
+  <meta name="theme-color" content="#0b1220" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <h1><span class="accent">UAE</span> Sign Language Recognition</h1>
+    <span id="status-pill">loading&hellip;</span>
+  </header>
+
+  <nav id="mode-tabs" aria-label="Choose a mode"></nav>
+
+  <div id="stage">
+    <video id="video" playsinline autoplay muted></video>
+    <canvas id="overlay"></canvas>
+    <div class="hint" id="hint">
+      Tap <strong>Start Camera</strong> below to begin. Allow camera access when your
+      browser asks.
+    </div>
+    <div id="prediction-chip">
+      <span id="pred-ar" dir="rtl" lang="ar"></span>
+      <span id="pred-en"></span>
+      <span id="pred-conf"></span>
+    </div>
+  </div>
+
+  <div id="mode-info">
+    <span class="name-en" id="mode-name-en"></span><span class="name-ar" id="mode-name-ar" dir="rtl" lang="ar"></span>
+    <div class="desc" id="mode-desc"></div>
+  </div>
+
+  <div id="tip-banner"></div>
+
+  <div id="buffer-row">
+    <span class="label">Text</span>
+    <span id="buffer-text"></span>
+  </div>
+
+  <div id="controls">
+    <button id="btn-start">Start Camera</button>
+    <button id="btn-backspace" title="Remove last word">&#9003;</button>
+    <button id="btn-clear" title="Clear text">Clear</button>
+  </div>
+
+  <footer>
+    Runs fully on this device &mdash; your camera video never leaves your phone.
+  </footer>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
