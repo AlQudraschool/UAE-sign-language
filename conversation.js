@@ -17,7 +17,9 @@ import {
 } from './vision.js';
 import {
   getDeviceId, createRoom, roomExists, sendMessage, listenMessages, stopListening,
+  clearSignaling,
 } from './room.js';
+import { startCall } from './webrtc.js';
 
 const QR_SCRIPT_URL = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
 let qrLoadPromise = null;
@@ -59,6 +61,9 @@ const els = {
 
   messages: document.getElementById('conv-messages'),
 
+  remoteVideo: document.getElementById('conv-remote-video'),
+  callHint: document.getElementById('conv-call-hint'),
+
   modeTabs: document.getElementById('conv-mode-tabs'),
   video: document.getElementById('conv-video'),
   overlay: document.getElementById('conv-overlay'),
@@ -68,7 +73,6 @@ const els = {
   predEn: document.getElementById('conv-pred-en'),
   predConf: document.getElementById('conv-pred-conf'),
   bufferText: document.getElementById('conv-buffer-text'),
-  btnCamera: document.getElementById('conv-btn-camera'),
   btnBackspace: document.getElementById('conv-btn-backspace'),
   btnClear: document.getElementById('conv-btn-clear'),
   btnSendSign: document.getElementById('conv-btn-send-sign'),
@@ -81,11 +85,13 @@ const els = {
 
 const state = {
   code: null,
+  isCaller: false,
   deviceId: getDeviceId(),
   currentMode: MODES[0],
   predictFn: null,
   handLandmarker: null,
   stream: null,
+  callController: null,
   running: false,
   textBuffer: '',
   lastLabel: null,
@@ -114,7 +120,14 @@ els.tabPractice.addEventListener('click', () => showScreen('practice'));
 els.tabConversation.addEventListener('click', () => showScreen('conversation'));
 
 document.addEventListener('app:screen-changed', (e) => {
-  if (e.detail.screen !== 'conversation') stopConvCamera();
+  if (e.detail.screen !== 'conversation') {
+    // Only one camera at a time (Practice mode uses its own). Leaving this
+    // screen pauses the video call, but keeps chat messages arriving in
+    // the background -- it resumes automatically when you come back.
+    stopCall();
+  } else if (state.code && !state.stream) {
+    beginCall();
+  }
 });
 
 // --- Mode tabs for the compose camera (mirrors app.js) ------------------------
@@ -172,7 +185,10 @@ function resizeOverlay() {
 function detectionLoop() {
   if (!state.running) return;
   const now = performance.now();
-  if (els.video.readyState >= 2) {
+  // handLandmarker may still be loading (or may have failed to load) even
+  // though the camera/call is already running -- the video call itself
+  // doesn't need it, only sign recognition does.
+  if (state.handLandmarker && els.video.readyState >= 2) {
     const result = state.handLandmarker.detectForVideo(els.video, now);
     const ctx = els.overlay.getContext('2d');
     ctx.clearRect(0, 0, els.overlay.width, els.overlay.height);
@@ -211,59 +227,107 @@ function detectionLoop() {
   state.loopHandle = requestAnimationFrame(detectionLoop);
 }
 
-async function startConvCamera() {
-  if (!state.handLandmarker) {
-    setStatus('loading MediaPipe...', null);
-    try {
-      state.handLandmarker = await getHandLandmarker();
-    } catch (err) {
-      console.error('Failed to load HandLandmarker', err);
-      setStatus('could not load MediaPipe -- check your connection', 'err');
-      return;
-    }
+// --- Camera + live video call --------------------------------------------
+//
+// Unlike Practice mode (manual Start Camera button), Conversation mode's
+// camera turns on AUTOMATICALLY as soon as you start or join a
+// conversation, and stays on the whole time -- because that same camera
+// feed is now also the live video sent to the other phone (see
+// webrtc.js), not just the input to sign recognition. Sign recognition
+// (the prediction chip, the draft text buffer) keeps working exactly as
+// before, using that same video.
+
+function setCallHint(text) {
+  if (!els.callHint) return;
+  if (text) {
+    els.callHint.textContent = text;
+    els.callHint.style.display = 'flex';
+  } else {
+    els.callHint.style.display = 'none';
   }
+}
+
+async function beginCall() {
+  setStatus('starting camera...', null);
   try {
     state.stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
-      audio: false,
+      audio: true,
     });
   } catch (err) {
-    console.error('Camera permission/error', err);
-    setStatus('camera access denied', 'err');
-    return;
+    console.warn('[conversation] camera+mic failed, trying camera only', err);
+    try {
+      state.stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+        audio: false,
+      });
+    } catch (err2) {
+      console.error('Camera permission/error', err2);
+      setStatus('camera access denied', 'err');
+      return;
+    }
   }
+
   els.video.srcObject = state.stream;
   await els.video.play();
-  els.hint.style.display = 'none';
+  if (els.hint) els.hint.style.display = 'none';
   resizeOverlay();
   window.addEventListener('resize', resizeOverlay);
   state.running = true;
-  els.btnCamera.textContent = 'Stop Camera';
-  els.btnCamera.classList.add('stop');
-  setStatus('conversation: camera running', 'ok');
+  setStatus('conversation: connecting video call...', null);
   detectionLoop();
+
+  if (!state.handLandmarker) {
+    try {
+      state.handLandmarker = await getHandLandmarker();
+    } catch (err) {
+      // Sign recognition won't work, but the video call itself doesn't
+      // need MediaPipe, so keep going rather than stopping the camera.
+      console.error('Failed to load HandLandmarker', err);
+    }
+  }
+
+  setCallHint("Waiting for the other person's video...");
+  try {
+    state.callController = await startCall(state.code, state.isCaller, state.stream, {
+      onRemoteStream: (remoteStream) => {
+        if (els.remoteVideo) {
+          els.remoteVideo.srcObject = remoteStream;
+          els.remoteVideo.play().catch(() => {});
+        }
+        setCallHint(null);
+      },
+      onState: (connState) => {
+        if (connState === 'connected') {
+          setStatus('conversation: connected', 'ok');
+        } else if (connState === 'failed' || connState === 'disconnected') {
+          setCallHint('Could not connect the video call -- text/sign messages still work.');
+        }
+      },
+    });
+  } catch (err) {
+    console.error('[webrtc] could not start call', err);
+    setCallHint('Could not start the video call -- text/sign messages still work.');
+  }
 }
 
-function stopConvCamera() {
+function stopCall() {
   state.running = false;
   if (state.loopHandle) cancelAnimationFrame(state.loopHandle);
+  if (state.callController) {
+    state.callController.close();
+    state.callController = null;
+  }
   if (state.stream) {
     state.stream.getTracks().forEach((t) => t.stop());
     state.stream = null;
   }
   if (els.video) els.video.srcObject = null;
+  if (els.remoteVideo) els.remoteVideo.srcObject = null;
   if (els.hint) els.hint.style.display = 'flex';
   if (els.chip) els.chip.classList.remove('show');
-  if (els.btnCamera) {
-    els.btnCamera.textContent = 'Start Camera';
-    els.btnCamera.classList.remove('stop');
-  }
+  setCallHint(null);
 }
-
-els.btnCamera.addEventListener('click', () => {
-  if (state.running) stopConvCamera();
-  else startConvCamera();
-});
 
 els.btnBackspace.addEventListener('click', () => {
   const words = state.textBuffer.split(' ').filter(Boolean);
@@ -344,6 +408,7 @@ function showRoom(code) {
     console.error(err);
     setStatus('could not connect -- check firebase-config.js', 'err');
   });
+  beginCall();
 }
 
 els.btnStart.addEventListener('click', async () => {
@@ -351,6 +416,10 @@ els.btnStart.addEventListener('click', async () => {
   setStatus('creating conversation...', null);
   try {
     const code = await createRoom();
+    state.isCaller = true;
+    // Defensive tidy-up in case this exact 4-digit code was used (and left
+    // uncleared) a while ago -- very unlikely, but cheap to guard against.
+    await clearSignaling(code).catch(() => {});
     setStatus('conversation ready', 'ok');
     showRoom(code);
     qrDesiredVisible = true;
@@ -385,6 +454,7 @@ async function attemptJoin(code) {
       els.joinError.hidden = false;
       return;
     }
+    state.isCaller = false;
     setStatus('conversation ready', 'ok');
     showRoom(code);
     await sendMessage(code, 'A new device joined this conversation.', state.deviceId, 'System', true);
@@ -403,9 +473,12 @@ els.codeInput.addEventListener('keydown', (e) => {
 });
 
 els.btnLeave.addEventListener('click', () => {
+  const leavingCode = state.code;
   stopListening();
-  stopConvCamera();
+  stopCall();
+  if (leavingCode) clearSignaling(leavingCode).catch(() => { /* best-effort tidy-up */ });
   state.code = null;
+  state.isCaller = false;
   els.convRoom.hidden = true;
   els.convStart.hidden = false;
   els.joinForm.hidden = true;

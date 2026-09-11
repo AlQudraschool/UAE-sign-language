@@ -150,3 +150,51 @@ export function stopListening() {
   messagesRef = null;
   messagesCallback = null;
 }
+
+// --- Signaling helpers for webrtc.js (live video calls) --------------------
+//
+// These don't know anything about video calls themselves -- they just read
+// and write small pieces of connection info under rooms/{code}/webrtc/...
+// in the same Firebase project, which webrtc.js uses to help the two
+// phones find each other before the actual video/audio starts flowing
+// directly between them.
+
+function webrtcRef(db, code, path) {
+  return db.ref(`rooms/${code}/webrtc/${path}`);
+}
+
+/** Overwrites one signaling value (e.g. the offer or answer). */
+export async function setSignal(code, path, data) {
+  const db = await getDatabase();
+  await webrtcRef(db, code, path).set(data);
+}
+
+/** Adds one item to a signaling list (e.g. one ICE candidate). */
+export async function pushSignal(code, path, data) {
+  const db = await getDatabase();
+  await webrtcRef(db, code, path).push(data);
+}
+
+/** Calls back with a value every time it changes (or null if it's not set yet). Returns an unsubscribe function. */
+export async function listenSignalValue(code, path, callback) {
+  const db = await getDatabase();
+  const ref = webrtcRef(db, code, path);
+  const cb = (snap) => callback(snap.exists() ? snap.val() : null);
+  ref.on('value', cb);
+  return () => ref.off('value', cb);
+}
+
+/** Calls back once for each item already in a list, and again for each new one added. Returns an unsubscribe function. */
+export async function listenSignalChildren(code, path, callback) {
+  const db = await getDatabase();
+  const ref = webrtcRef(db, code, path);
+  const cb = (snap) => callback(snap.val());
+  ref.on('child_added', cb);
+  return () => ref.off('child_added', cb);
+}
+
+/** Clears out any old offer/answer/candidates for a room before starting a fresh call. */
+export async function clearSignaling(code) {
+  const db = await getDatabase();
+  await db.ref(`rooms/${code}/webrtc`).remove();
+}

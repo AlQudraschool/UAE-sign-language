@@ -69,8 +69,9 @@
   <!-- =========================== CONVERSATION ============================ -->
   <section id="screen-conversation" hidden>
     <p class="conv-intro">
-      One person signs, the other reads the message on their own phone &mdash;
-      like texting, but in sign language. Both phones need this same app open.
+      A live video call between both phones, plus sign-to-text messages &mdash;
+      one person signs, the other reads the message on their own phone. Both
+      phones need this same app open.
     </p>
 
     <div id="conv-start">
@@ -95,15 +96,24 @@
         <p>Scan this on the other phone to join instantly.</p>
       </div>
 
+      <div id="conv-call">
+        <span class="conv-call-label">Them &mdash; live video</span>
+        <div id="conv-remote-stage">
+          <video id="conv-remote-video" playsinline autoplay></video>
+          <div class="hint" id="conv-call-hint">Connecting video call&hellip;</div>
+        </div>
+      </div>
+
       <div id="conv-messages"></div>
 
       <div id="conv-camera-panel">
+        <span class="conv-call-label">You</span>
         <div id="conv-mode-tabs" aria-label="Choose a sign language mode"></div>
         <div id="conv-stage">
           <video id="conv-video" playsinline autoplay muted></video>
           <canvas id="conv-overlay"></canvas>
           <div class="hint" id="conv-hint">
-            Tap <strong>Start Camera</strong> to sign your message.
+            Your camera turns on automatically and is shared live with the other phone.
           </div>
           <div id="conv-prediction-chip">
             <span id="conv-pred-ar" dir="rtl" lang="ar"></span>
@@ -116,7 +126,6 @@
           <span id="conv-buffer-text">—</span>
         </div>
         <div id="conv-camera-controls">
-          <button id="conv-btn-camera">Start Camera</button>
           <button id="conv-btn-backspace" title="Remove last word">&#9003;</button>
           <button id="conv-btn-clear" title="Clear draft">Clear</button>
           <button id="conv-btn-send-sign" class="send">Send</button>
