@@ -27,7 +27,7 @@ const MODEL_ASSET_URL =
 // word). Same values as inference_classifier.py so the phone app feels
 // the same as the desktop app.
 export const STABLE_FRAMES_TO_COMMIT = 15; // ~0.5s at a typical camera frame rate
-export const MIN_CONFIDENCE_TO_COMMIT = 60; // percent
+export const MIN_CONFIDENCE_TO_COMMIT = 40; // percent
 
 let visionModule = null;
 let handLandmarkerPromise = null;
