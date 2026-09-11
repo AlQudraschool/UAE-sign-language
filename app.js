@@ -28,27 +28,10 @@
  */
 
 import { MODES, lookupClass } from './modes.js';
-
-const TASKS_VISION_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest';
-const WASM_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm';
-const MODEL_ASSET_URL =
-  'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
-
-let visionModule = null; // lazily loaded on first Start Camera tap
-
-// Same debounce constants as inference_classifier.py.
-const STABLE_FRAMES_TO_COMMIT = 15; // ~0.5s at a typical camera frame rate
-const MIN_CONFIDENCE_TO_COMMIT = 60; // percent
-
-// Standard MediaPipe hand-skeleton connections (21 landmarks).
-const HAND_CONNECTIONS = [
-  [0, 1], [1, 2], [2, 3], [3, 4],
-  [0, 5], [5, 6], [6, 7], [7, 8],
-  [5, 9], [9, 10], [10, 11], [11, 12],
-  [9, 13], [13, 14], [14, 15], [15, 16],
-  [13, 17], [17, 18], [18, 19], [19, 20],
-  [0, 17],
-];
+import {
+  getHandLandmarker, landmarksToFeatures, drawLandmarks,
+  STABLE_FRAMES_TO_COMMIT, MIN_CONFIDENCE_TO_COMMIT,
+} from './vision.js';
 
 const els = {
   statusPill: document.getElementById('status-pill'),
@@ -131,47 +114,12 @@ async function selectMode(mode) {
   }
 }
 
-// --- Feature extraction (mirrors hand_utils.py exactly) ------------------
-
-function landmarksToFeatures(landmarks) {
-  let minX = Infinity;
-  let minY = Infinity;
-  for (const lm of landmarks) {
-    if (lm.x < minX) minX = lm.x;
-    if (lm.y < minY) minY = lm.y;
-  }
-  const features = [];
-  for (const lm of landmarks) {
-    features.push(lm.x - minX);
-    features.push(lm.y - minY);
-  }
-  return features;
-}
-
 // --- Drawing ---------------------------------------------------------------
 
 function resizeOverlayToVideo() {
   const rect = els.video.getBoundingClientRect();
   els.overlay.width = rect.width;
   els.overlay.height = rect.height;
-}
-
-function drawLandmarks(ctx, landmarks, w, h) {
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = 'rgba(23,195,162,0.9)';
-  ctx.beginPath();
-  for (const [a, b] of HAND_CONNECTIONS) {
-    ctx.moveTo(landmarks[a].x * w, landmarks[a].y * h);
-    ctx.lineTo(landmarks[b].x * w, landmarks[b].y * h);
-  }
-  ctx.stroke();
-
-  ctx.fillStyle = '#d4af37';
-  for (const lm of landmarks) {
-    ctx.beginPath();
-    ctx.arc(lm.x * w, lm.y * h, 3, 0, Math.PI * 2);
-    ctx.fill();
-  }
 }
 
 function updateBufferUI() {
@@ -245,17 +193,7 @@ async function startCamera() {
   if (!state.handLandmarker) {
     setStatus('loading MediaPipe...', null);
     try {
-      if (!visionModule) {
-        visionModule = await import(TASKS_VISION_URL);
-      }
-      const { HandLandmarker, FilesetResolver } = visionModule;
-      const vision = await FilesetResolver.forVisionTasks(WASM_BASE);
-      state.handLandmarker = await HandLandmarker.createFromOptions(vision, {
-        baseOptions: { modelAssetPath: MODEL_ASSET_URL, delegate: 'GPU' },
-        runningMode: 'VIDEO',
-        numHands: 1,
-        minHandDetectionConfidence: 0.5,
-      });
+      state.handLandmarker = await getHandLandmarker();
     } catch (err) {
       console.error('Failed to load HandLandmarker', err);
       setStatus('could not load MediaPipe -- check your connection', 'err');
@@ -320,6 +258,13 @@ els.btnBackspace.addEventListener('click', () => {
 els.btnClear.addEventListener('click', () => {
   state.textBuffer = '';
   updateBufferUI();
+});
+
+// Stop this screen's camera whenever the user switches to Conversation mode,
+// so two camera loops (and two "who's using the camera" prompts) never run
+// at once. conversation.js fires this same event when switching the other way.
+document.addEventListener('app:screen-changed', (e) => {
+  if (e.detail.screen !== 'practice' && state.running) stopCamera();
 });
 
 // --- Init ----------------------------------------------------------------------

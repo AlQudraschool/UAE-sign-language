@@ -11,13 +11,17 @@
  * converted) will keep working offline after that first visit.
  */
 
-const CACHE_NAME = 'uae-sign-language-v1';
+const CACHE_NAME = 'uae-sign-language-v2';
 const APP_SHELL = [
   './',
   './index.html',
   './styles.css',
   './app.js',
   './modes.js',
+  './vision.js',
+  './conversation.js',
+  './room.js',
+  './firebase-config.js',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',

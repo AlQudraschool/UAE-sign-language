@@ -248,3 +248,343 @@ footer {
 @media (min-width: 640px) {
   body { max-width: 480px; margin: 0 auto; }
 }
+
+/* ======================================================================
+   Screen tabs (Practice / Conversation)
+   ====================================================================== */
+#screen-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 0 12px 10px;
+}
+
+.screen-tab {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 10px;
+  padding: 10px 8px;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.screen-tab.active {
+  border-color: var(--accent);
+  background: linear-gradient(180deg, rgba(23,195,162,0.18), rgba(23,195,162,0.04));
+  color: var(--text);
+}
+
+#screen-conversation { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+#screen-conversation[hidden] { display: none; }
+
+/* Elements below set their own `display` (flex/grid) for when they're
+   showing, which -- by normal CSS cascade rules -- would otherwise
+   silently defeat their `hidden` attribute (an author stylesheet rule
+   always wins over the browser's built-in `[hidden] { display: none }`
+   rule). These re-assert `display: none` whenever `hidden` is present so
+   the attribute actually works. */
+#conv-room[hidden],
+#conv-join-form[hidden],
+#conv-start[hidden] {
+  display: none;
+}
+
+.conv-intro {
+  margin: 0 12px 10px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+/* --- Start / Join ------------------------------------------------------- */
+#conv-start {
+  margin: 0 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.conv-big-btn {
+  background: var(--accent);
+  color: #06251f;
+  padding: 14px;
+  font-size: 0.95rem;
+}
+
+.conv-big-btn.secondary {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+#conv-join-form {
+  display: flex;
+  gap: 8px;
+}
+
+#conv-code-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 1.1rem;
+  letter-spacing: 0.15em;
+  text-align: center;
+}
+
+#conv-join-form button {
+  background: var(--accent);
+  color: #06251f;
+}
+
+.conv-error {
+  color: var(--accent-3);
+  font-size: 0.8rem;
+  margin: 2px 2px 0;
+}
+
+/* --- Room / chat ---------------------------------------------------------- */
+#conv-room {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  margin: 0 12px;
+}
+
+#conv-room-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 2px 8px;
+  font-size: 0.85rem;
+}
+
+#conv-room-header strong {
+  color: var(--accent-2);
+  letter-spacing: 0.1em;
+}
+
+#conv-room-header button {
+  padding: 6px 10px;
+  font-size: 0.72rem;
+}
+
+#conv-btn-qr {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+#conv-btn-leave {
+  background: var(--panel-2);
+  color: var(--accent-3);
+  border: 1px solid var(--border);
+  margin-inline-start: auto;
+}
+
+#conv-qr {
+  text-align: center;
+  background: #fff;
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 10px;
+}
+
+#conv-qr-box {
+  display: flex;
+  justify-content: center;
+}
+
+#conv-qr p {
+  margin: 8px 0 0;
+  color: #333;
+  font-size: 0.75rem;
+}
+
+#conv-messages {
+  flex: 1;
+  min-height: 140px;
+  max-height: 34vh;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.conv-placeholder {
+  margin: auto;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.8rem;
+  padding: 12px;
+}
+
+.conv-msg {
+  max-width: 80%;
+  padding: 8px 12px;
+  border-radius: 14px;
+  font-size: 0.9rem;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.conv-msg.mine {
+  align-self: flex-end;
+  background: var(--accent);
+  color: #06251f;
+  border-bottom-right-radius: 4px;
+}
+
+.conv-msg.theirs {
+  align-self: flex-start;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+}
+
+.conv-msg-system {
+  align-self: center;
+  color: var(--muted);
+  font-size: 0.72rem;
+  padding: 2px 8px;
+}
+
+/* --- Compose camera panel -------------------------------------------------- */
+#conv-camera-panel {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+#conv-mode-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+#conv-stage {
+  position: relative;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #000;
+  aspect-ratio: 4 / 3;
+  border: 1px solid var(--border);
+}
+
+#conv-stage video, #conv-stage canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+#conv-stage video { transform: scaleX(-1); }
+#conv-overlay { transform: scaleX(-1); }
+
+#conv-stage .hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 16px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  background: rgba(11, 18, 32, 0.55);
+}
+
+#conv-prediction-chip {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  right: 8px;
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  background: rgba(10, 16, 28, 0.72);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(23,195,162,0.5);
+  border-radius: 10px;
+  padding: 6px 10px;
+}
+#conv-prediction-chip.show { display: flex; }
+#conv-pred-ar { direction: rtl; font-size: 1rem; font-weight: 700; color: var(--accent-2); }
+#conv-pred-en { font-size: 0.9rem; font-weight: 700; color: var(--accent); }
+#conv-pred-conf { font-size: 0.68rem; color: var(--muted); }
+
+#conv-buffer-row {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  font-size: 0.9rem;
+  word-break: break-word;
+}
+#conv-buffer-row .label {
+  color: var(--muted);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-inline-end: 8px;
+  flex: none;
+}
+
+#conv-camera-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+#conv-camera-controls #conv-btn-camera {
+  grid-column: 1 / -1;
+  background: var(--accent);
+  color: #06251f;
+}
+#conv-camera-controls #conv-btn-camera.stop { background: var(--accent-3); color: #2b0a13; }
+#conv-camera-controls #conv-btn-backspace,
+#conv-camera-controls #conv-btn-clear {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+#conv-camera-controls .send {
+  background: var(--accent-2);
+  color: #241b02;
+}
+
+/* --- Text compose ------------------------------------------------------------ */
+#conv-text-compose {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0 4px;
+}
+#conv-text-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 0.9rem;
+}
+#conv-text-compose .send {
+  background: var(--accent-2);
+  color: #241b02;
+}

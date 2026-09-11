@@ -4,11 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>UAE Sign Language Recognition</title>
-  <meta name="description" content="Multi-mode sign language recognition: ASL, Arabic Sign Language, Essential Needs, and UAE Etiquette gestures -- runs right in your phone's browser." />
+  <meta name="description" content="Multi-mode sign language recognition: ASL, Arabic Sign Language, Essential Needs, and UAE Etiquette gestures -- runs right in your phone's browser, plus a live two-phone Conversation mode." />
   <meta name="theme-color" content="#0b1220" />
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link rel="stylesheet" href="styles.css" />
@@ -19,44 +20,122 @@
     <span id="status-pill">loading&hellip;</span>
   </header>
 
-  <nav id="mode-tabs" aria-label="Choose a mode"></nav>
+  <nav id="screen-tabs" aria-label="Choose a screen">
+    <button id="tab-practice" class="screen-tab active">Practice</button>
+    <button id="tab-conversation" class="screen-tab">Conversation</button>
+  </nav>
 
-  <div id="stage">
-    <video id="video" playsinline autoplay muted></video>
-    <canvas id="overlay"></canvas>
-    <div class="hint" id="hint">
-      Tap <strong>Start Camera</strong> below to begin. Allow camera access when your
-      browser asks.
+  <!-- ============================= PRACTICE ============================= -->
+  <section id="screen-practice">
+    <nav id="mode-tabs" aria-label="Choose a mode"></nav>
+
+    <div id="stage">
+      <video id="video" playsinline autoplay muted></video>
+      <canvas id="overlay"></canvas>
+      <div class="hint" id="hint">
+        Tap <strong>Start Camera</strong> below to begin. Allow camera access when your
+        browser asks.
+      </div>
+      <div id="prediction-chip">
+        <span id="pred-ar" dir="rtl" lang="ar"></span>
+        <span id="pred-en"></span>
+        <span id="pred-conf"></span>
+      </div>
     </div>
-    <div id="prediction-chip">
-      <span id="pred-ar" dir="rtl" lang="ar"></span>
-      <span id="pred-en"></span>
-      <span id="pred-conf"></span>
+
+    <div id="mode-info">
+      <span class="name-en" id="mode-name-en"></span><span class="name-ar" id="mode-name-ar" dir="rtl" lang="ar"></span>
+      <div class="desc" id="mode-desc"></div>
     </div>
-  </div>
 
-  <div id="mode-info">
-    <span class="name-en" id="mode-name-en"></span><span class="name-ar" id="mode-name-ar" dir="rtl" lang="ar"></span>
-    <div class="desc" id="mode-desc"></div>
-  </div>
+    <div id="tip-banner"></div>
 
-  <div id="tip-banner"></div>
+    <div id="buffer-row">
+      <span class="label">Text</span>
+      <span id="buffer-text"></span>
+    </div>
 
-  <div id="buffer-row">
-    <span class="label">Text</span>
-    <span id="buffer-text"></span>
-  </div>
+    <div id="controls">
+      <button id="btn-start">Start Camera</button>
+      <button id="btn-backspace" title="Remove last word">&#9003;</button>
+      <button id="btn-clear" title="Clear text">Clear</button>
+    </div>
 
-  <div id="controls">
-    <button id="btn-start">Start Camera</button>
-    <button id="btn-backspace" title="Remove last word">&#9003;</button>
-    <button id="btn-clear" title="Clear text">Clear</button>
-  </div>
+    <footer>
+      Runs fully on this device &mdash; your camera video never leaves your phone.
+    </footer>
+  </section>
 
-  <footer>
-    Runs fully on this device &mdash; your camera video never leaves your phone.
-  </footer>
+  <!-- =========================== CONVERSATION ============================ -->
+  <section id="screen-conversation" hidden>
+    <p class="conv-intro">
+      One person signs, the other reads the message on their own phone &mdash;
+      like texting, but in sign language. Both phones need this same app open.
+    </p>
+
+    <div id="conv-start">
+      <button id="conv-btn-start" class="conv-big-btn">Start a Conversation</button>
+      <button id="conv-btn-join" class="conv-big-btn secondary">Join a Conversation</button>
+      <div id="conv-join-form" hidden>
+        <input id="conv-code-input" inputmode="numeric" maxlength="4" placeholder="4-digit code" autocomplete="off" />
+        <button id="conv-btn-join-confirm">Join</button>
+      </div>
+      <p id="conv-join-error" class="conv-error" hidden></p>
+    </div>
+
+    <div id="conv-room" hidden>
+      <div id="conv-room-header">
+        <span>Code: <strong id="conv-room-code"></strong></span>
+        <button id="conv-btn-qr" title="Show QR code">QR</button>
+        <button id="conv-btn-leave" title="Leave this conversation">Leave</button>
+      </div>
+
+      <div id="conv-qr" hidden>
+        <div id="conv-qr-box"></div>
+        <p>Scan this on the other phone to join instantly.</p>
+      </div>
+
+      <div id="conv-messages"></div>
+
+      <div id="conv-camera-panel">
+        <div id="conv-mode-tabs" aria-label="Choose a sign language mode"></div>
+        <div id="conv-stage">
+          <video id="conv-video" playsinline autoplay muted></video>
+          <canvas id="conv-overlay"></canvas>
+          <div class="hint" id="conv-hint">
+            Tap <strong>Start Camera</strong> to sign your message.
+          </div>
+          <div id="conv-prediction-chip">
+            <span id="conv-pred-ar" dir="rtl" lang="ar"></span>
+            <span id="conv-pred-en"></span>
+            <span id="conv-pred-conf"></span>
+          </div>
+        </div>
+        <div id="conv-buffer-row">
+          <span class="label">Draft</span>
+          <span id="conv-buffer-text">—</span>
+        </div>
+        <div id="conv-camera-controls">
+          <button id="conv-btn-camera">Start Camera</button>
+          <button id="conv-btn-backspace" title="Remove last word">&#9003;</button>
+          <button id="conv-btn-clear" title="Clear draft">Clear</button>
+          <button id="conv-btn-send-sign" class="send">Send</button>
+        </div>
+      </div>
+
+      <div id="conv-text-compose">
+        <input id="conv-text-input" placeholder="Or type a message..." autocomplete="off" />
+        <button id="conv-btn-send-text" class="send">Send</button>
+      </div>
+    </div>
+
+    <footer>
+      Messages travel through your own free Firebase project &mdash; see
+      README_WEBAPP.md if this screen says it can't connect.
+    </footer>
+  </section>
 
   <script type="module" src="app.js"></script>
+  <script type="module" src="conversation.js"></script>
 </body>
 </html>

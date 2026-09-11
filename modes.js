@@ -50,6 +50,13 @@ const NEEDS_RAW = [
   ['thankyou', 'Thank You', 'شكراً'],
   ['wait', 'Wait', 'انتظر'],
   ['doctor', 'Doctor', 'طبيب'],
+  // Everyday conversational phrases -- added so Conversation mode can send
+  // a whole common phrase as ONE sign instead of fingerspelling it.
+  ['hello', 'Hello', 'مرحباً'],
+  ['howareyou', 'How Are You', 'كيف حالك'],
+  ['imfine', 'I Am Fine', 'أنا بخير'],
+  ['nicetomeetyou', 'Nice To Meet You', 'تشرفنا'],
+  ['goodbye', 'Goodbye', 'مع السلامة'],
 ];
 const NEEDS_CLASSES = NEEDS_RAW.map(([label, en, ar]) => ({ label, displayEn: en, displayAr: ar, tip: null }));
 
@@ -83,7 +90,7 @@ export const MODES = [
   {
     id: 'needs', key: '3',
     nameEn: 'Essential Needs', nameAr: 'الاحتياجات الأساسية',
-    description: 'A small, easy-to-learn gesture set for urgent everyday needs.',
+    description: 'A small, easy-to-learn gesture set for urgent needs and everyday conversation.',
     classes: NEEDS_CLASSES,
   },
   {
