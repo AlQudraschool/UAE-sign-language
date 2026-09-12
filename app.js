@@ -34,6 +34,7 @@ import {
 } from './vision.js';
 import { notifyCommit } from './feedback.js';
 import { speakSign } from './speech.js';
+import { videoConstraints } from './camera.js';
 
 const els = {
   statusPill: document.getElementById('status-pill'),
@@ -224,7 +225,7 @@ async function startCamera() {
 
   try {
     state.stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+      video: videoConstraints(),
       audio: false,
     });
   } catch (err) {
@@ -286,6 +287,28 @@ els.btnClear.addEventListener('click', () => {
 // at once. conversation.js fires this same event when switching the other way.
 document.addEventListener('app:screen-changed', (e) => {
   if (e.detail.screen !== 'practice' && state.running) stopCamera();
+});
+
+// Front/back camera switch (camera.js). Swaps the live stream over without
+// tearing the screen down, so the text you've already typed survives.
+document.addEventListener('app:camera-changed', async () => {
+  if (!state.running) return;
+  const previous = state.stream;
+  try {
+    state.stream = await navigator.mediaDevices.getUserMedia({
+      video: videoConstraints(),
+      audio: false,
+    });
+  } catch (err) {
+    console.error('Could not switch camera', err);
+    state.stream = previous; // keep the camera we already had
+    setStatus('could not switch camera', 'err');
+    return;
+  }
+  if (previous) previous.getTracks().forEach((t) => t.stop());
+  els.video.srcObject = state.stream;
+  await els.video.play().catch(() => {});
+  resizeOverlayToVideo();
 });
 
 // --- Init ----------------------------------------------------------------------

@@ -22,6 +22,7 @@ import {
 import { startCall } from './webrtc.js';
 import { notifyCommit } from './feedback.js';
 import { speakSign, speakText } from './speech.js';
+import { videoConstraints } from './camera.js';
 
 // How long (ms) to wait after the last recognized sign before auto-sending
 // the draft as a finished message, when Auto-caption is on -- long enough
@@ -140,6 +141,47 @@ function showScreen(name) {
 els.tabPractice.addEventListener('click', () => showScreen('practice'));
 els.tabConversation.addEventListener('click', () => showScreen('conversation'));
 if (els.tabQuiz) els.tabQuiz.addEventListener('click', () => showScreen('quiz'));
+
+// Front/back camera switch (camera.js). Only the VIDEO track is swapped:
+// the microphone keeps running untouched, and the live call stays up --
+// replaceVideoTrack() changes what the other phone sees without
+// renegotiating the connection. If that isn't possible for some reason,
+// the local camera still switches; only the far end keeps the old view.
+document.addEventListener('app:camera-changed', async () => {
+  if (!state.stream) return;
+  let newStream;
+  try {
+    newStream = await navigator.mediaDevices.getUserMedia({
+      video: videoConstraints(),
+      audio: false,
+    });
+  } catch (err) {
+    console.error('Could not switch camera', err);
+    setStatus('could not switch camera', 'err');
+    return;
+  }
+
+  const newTrack = newStream.getVideoTracks()[0];
+  if (!newTrack) return;
+
+  if (state.callController && state.callController.replaceVideoTrack) {
+    try {
+      await state.callController.replaceVideoTrack(newTrack);
+    } catch (err) {
+      console.warn('[conversation] could not send the new camera to the other phone', err);
+    }
+  }
+
+  const oldTrack = state.stream.getVideoTracks()[0];
+  if (oldTrack) {
+    state.stream.removeTrack(oldTrack);
+    oldTrack.stop();
+  }
+  state.stream.addTrack(newTrack);
+  els.video.srcObject = state.stream;
+  await els.video.play().catch(() => {});
+  resizeOverlay();
+});
 
 document.addEventListener('app:screen-changed', (e) => {
   if (e.detail.screen !== 'conversation') {
@@ -349,14 +391,14 @@ async function beginCall() {
   setStatus('starting camera...', null);
   try {
     state.stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+      video: videoConstraints(),
       audio: true,
     });
   } catch (err) {
     console.warn('[conversation] camera+mic failed, trying camera only', err);
     try {
       state.stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+        video: videoConstraints(),
         audio: false,
       });
     } catch (err2) {

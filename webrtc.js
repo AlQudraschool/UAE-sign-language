@@ -135,6 +135,19 @@ export async function startCall(code, isCaller, localStream, callbacks = {}) {
   unsubscribers.push(unsubTheirCandidates);
 
   return {
+    /**
+     * Swaps the video being sent to the other phone (used when switching
+     * between the front and back camera) WITHOUT tearing down and
+     * rebuilding the call. The connection stays up and the other side just
+     * sees the picture change -- renegotiating from scratch would drop the
+     * call for a second or two, which looks broken during a live demo.
+     */
+    async replaceVideoTrack(track) {
+      const sender = pc.getSenders().find((s) => s.track && s.track.kind === 'video');
+      if (!sender) throw new Error('no video track is being sent yet');
+      await sender.replaceTrack(track);
+    },
+
     close() {
       unsubscribers.forEach((unsub) => {
         try { unsub(); } catch (err) { /* already gone -- fine */ }

@@ -21,6 +21,7 @@ import {
 } from './vision.js';
 import { notifyCommit, notifySuccess } from './feedback.js';
 import { speakSign } from './speech.js';
+import { videoConstraints } from './camera.js';
 
 const ROUND_SECONDS = 60;
 const BEST_KEY = 'uae-sign-quiz-best';
@@ -220,7 +221,7 @@ function runQuizScreen() {
 
     try {
       state.stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+        video: videoConstraints(),
         audio: false,
       });
     } catch (err) {
@@ -293,6 +294,27 @@ function runQuizScreen() {
 
   document.addEventListener('app:screen-changed', (e) => {
     if (e.detail.screen !== 'quiz' && state.running) endQuiz(true);
+  });
+
+  // Front/back camera switch -- swap the stream over without ending the
+  // round, so nobody loses their score mid-game.
+  document.addEventListener('app:camera-changed', async () => {
+    if (!state.running) return;
+    const previous = state.stream;
+    try {
+      state.stream = await navigator.mediaDevices.getUserMedia({
+        video: videoConstraints(),
+        audio: false,
+      });
+    } catch (err) {
+      console.error('Could not switch camera', err);
+      state.stream = previous;
+      return;
+    }
+    if (previous) previous.getTracks().forEach((t) => t.stop());
+    els.video.srcObject = state.stream;
+    await els.video.play().catch(() => {});
+    resizeOverlay();
   });
 
   renderModeTabs();

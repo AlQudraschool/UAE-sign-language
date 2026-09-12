@@ -302,6 +302,22 @@ Two different QR codes now appear once a Conversation-mode room is open:
 4. Optionally, invite one VIP to try **Quiz mode** (see below) on a
    second phone afterwards, for a hands-on moment.
 
+### 3b. Front/back camera switch
+
+The **🤳 Front / 📷 Back** button at the top switches between the phone's
+selfie camera and its rear camera, on all three screens. Use the rear
+camera when you're filming *someone else* signing — a student on stage, or
+a visitor trying it — rather than yourself.
+
+The view is mirrored on the front camera (so raising your right hand raises
+the hand on the right of the screen, as people expect) and un-mirrored on
+the back camera (so the person you're filming isn't flipped). The
+hand-skeleton overlay flips with it. Recognition is unaffected either way:
+MediaPipe reads the real camera frame, not the mirrored picture.
+
+In Conversation mode the switch happens *without dropping the video call* —
+only the video being sent is swapped; the microphone keeps running.
+
 ### 4. Haptic + sound feedback
 
 Every time a sign is successfully recognized and typed, the phone gives a

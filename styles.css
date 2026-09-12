@@ -56,7 +56,7 @@ header.topbar h1 span.accent { color: var(--accent); }
   flex-wrap: wrap;
 }
 
-#voice-toggle {
+#voice-toggle, #camera-toggle {
   background: var(--panel);
   border: 1px solid var(--border);
   color: var(--muted);
@@ -68,6 +68,23 @@ header.topbar h1 span.accent { color: var(--accent); }
 }
 #voice-toggle.on { color: var(--accent); border-color: var(--accent); }
 #voice-toggle:disabled { opacity: 0.5; cursor: default; }
+#camera-toggle.back { color: var(--accent-2); border-color: var(--accent-2); }
+
+/* --- Front/back camera mirroring ---------------------------------------
+   The front camera is shown mirrored (below), because that's what people
+   expect when looking at themselves. With the BACK camera you're filming
+   someone else, so the picture must NOT be flipped -- these rules undo the
+   mirroring for every camera view at once. The video and its hand-skeleton
+   overlay always flip together, or the skeleton would sit on the wrong side
+   of the hand. camera.js sets data-facing on <body>. */
+body[data-facing="environment"] #stage video,
+body[data-facing="environment"] #overlay,
+body[data-facing="environment"] #conv-stage video,
+body[data-facing="environment"] #conv-overlay,
+body[data-facing="environment"] #quiz-video,
+body[data-facing="environment"] #quiz-overlay {
+  transform: none;
+}
 
 #status-pill {
   font-size: 0.72rem;
