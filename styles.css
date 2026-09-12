@@ -49,6 +49,26 @@ header.topbar h1 {
 
 header.topbar h1 span.accent { color: var(--accent); }
 
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+#voice-toggle {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+#voice-toggle.on { color: var(--accent); border-color: var(--accent); }
+#voice-toggle:disabled { opacity: 0.5; cursor: default; }
+
 #status-pill {
   font-size: 0.72rem;
   color: var(--muted);
@@ -254,7 +274,7 @@ footer {
    ====================================================================== */
 #screen-tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 6px;
   padding: 0 12px 10px;
 }
@@ -357,6 +377,7 @@ footer {
 
 #conv-room-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   padding: 4px 2px 8px;
@@ -447,6 +468,42 @@ footer {
   color: var(--muted);
   font-size: 0.8rem;
   background: rgba(11, 18, 32, 0.55);
+}
+
+/* Live streaming caption overlay -- like TV subtitles -- shows the OTHER
+   phone's in-progress sign draft in real time, before they even tap Send. */
+#conv-remote-caption {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  display: none;
+  text-align: center;
+  background: rgba(10, 16, 28, 0.78);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(212,175,55,0.5);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--accent-2);
+  word-break: break-word;
+}
+
+#conv-audience-qr {
+  text-align: center;
+  background: #fff;
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 10px;
+}
+#conv-audience-qr-box { display: flex; justify-content: center; }
+#conv-audience-qr p { margin: 8px 0 0; color: #333; font-size: 0.75rem; }
+
+#conv-btn-audience-qr {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
 }
 
 #conv-messages {
@@ -588,6 +645,21 @@ footer {
   margin-inline-end: 8px;
   flex: none;
 }
+#conv-buffer-row span#conv-buffer-text { flex: 1; }
+
+#conv-btn-autocaption {
+  flex: none;
+  margin-inline-start: 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+#conv-btn-autocaption.on { color: var(--accent); border-color: var(--accent); }
 
 #conv-camera-controls {
   display: grid;
@@ -625,4 +697,146 @@ footer {
 #conv-text-compose .send {
   background: var(--accent-2);
   color: #241b02;
+}
+
+/* ======================================================================
+   Quiz screen
+   ====================================================================== */
+#screen-quiz { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+#screen-quiz[hidden] { display: none; }
+
+#quiz-mode-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  padding: 0 12px 10px;
+}
+
+#quiz-scoreboard {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin: 0 12px 10px;
+}
+
+.quiz-score-box {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 6px;
+  text-align: center;
+}
+.quiz-score-label {
+  display: block;
+  color: var(--muted);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.quiz-score-box span:last-child {
+  display: block;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--accent);
+}
+#quiz-timer { color: var(--accent-3) !important; }
+#quiz-best { color: var(--accent-2) !important; }
+
+#quiz-stage {
+  position: relative;
+  margin: 0 12px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #000;
+  aspect-ratio: 3 / 4;
+  border: 1px solid var(--border);
+}
+
+#quiz-stage video, #quiz-stage canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+#quiz-video { transform: scaleX(-1); }
+#quiz-overlay { transform: scaleX(-1); }
+
+#quiz-stage .hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  background: rgba(11, 18, 32, 0.55);
+}
+
+#quiz-target {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: 10px;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: rgba(10, 16, 28, 0.78);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(23,195,162,0.5);
+  border-radius: 10px;
+  padding: 10px 12px;
+  text-align: center;
+}
+#quiz-target.show { display: flex; }
+.quiz-target-label {
+  color: var(--muted);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+#quiz-target-ar { direction: rtl; font-size: 1.5rem; font-weight: 800; color: var(--accent-2); }
+#quiz-target-en { font-size: 1.7rem; font-weight: 800; color: var(--accent); }
+
+#quiz-flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+#quiz-flash.correct {
+  background: rgba(23,195,162,0.35);
+  animation: quiz-flash-pop 0.5s ease-out;
+}
+#quiz-flash.miss {
+  background: rgba(239,71,111,0.28);
+  animation: quiz-flash-pop 0.35s ease-out;
+}
+@keyframes quiz-flash-pop {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+#quiz-result {
+  margin: 14px 16px 0;
+  text-align: center;
+}
+#quiz-result h2 {
+  margin: 0 0 4px;
+  color: var(--accent);
+  font-size: 1.2rem;
+}
+#quiz-result p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+#quiz-result strong { color: var(--text); }
+
+#quiz-controls {
+  padding: 12px 12px 4px;
+}
+#quiz-btn-start {
+  width: 100%;
+  background: var(--accent);
+  color: #06251f;
 }

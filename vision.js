@@ -24,10 +24,28 @@ const MODEL_ASSET_URL =
 
 // How many frames in a row the same sign has to hold steady, and how
 // confident the model has to be, before it "commits" (types the letter/
-// word). Same values as inference_classifier.py so the phone app feels
-// the same as the desktop app.
+// word).
 export const STABLE_FRAMES_TO_COMMIT = 15; // ~0.5s at a typical camera frame rate
-export const MIN_CONFIDENCE_TO_COMMIT = 40; // percent
+
+// Confidence needed to commit, as a percentage.
+//
+// This is deliberately low, and that's safe because of how confidence is
+// calculated: it's the share of the forest's votes the winning class got,
+// out of 36 possible ASL classes (28 for Arabic). Pure guessing would sit
+// around 3%. A letter reading 25% has ~9x more support than chance.
+//
+// It was 40, which turned out to be too strict in real use: letters the
+// model identified CORRECTLY but with modest confidence (a correct "D" at
+// 23%, a correct "Y" at 33%) were recognised on screen and then never
+// typed. That happens because the training photos were recorded on a
+// laptop webcam while the demo runs on a phone held at arm's length --
+// the model is right, just less certain from an angle it hasn't seen.
+//
+// The stability requirement above does most of the filtering: a sign has
+// to hold steady for 15 straight frames, which random noise doesn't do.
+// If letters still fail to type on your demo phone, lower this to 20. If
+// you get wrong letters typing themselves, raise it back towards 35.
+export const MIN_CONFIDENCE_TO_COMMIT = 25; // percent
 
 let visionModule = null;
 let handLandmarkerPromise = null;

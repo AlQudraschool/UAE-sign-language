@@ -17,12 +17,16 @@
 <body>
   <header class="topbar">
     <h1><span class="accent">UAE</span> Sign Language Recognition</h1>
-    <span id="status-pill">loading&hellip;</span>
+    <div class="topbar-right">
+      <button id="voice-toggle" title="Read recognized signs and messages out loud, in English and Arabic">🔊 Voice: On</button>
+      <span id="status-pill">loading&hellip;</span>
+    </div>
   </header>
 
   <nav id="screen-tabs" aria-label="Choose a screen">
     <button id="tab-practice" class="screen-tab active">Practice</button>
     <button id="tab-conversation" class="screen-tab">Conversation</button>
+    <button id="tab-quiz" class="screen-tab">Quiz</button>
   </nav>
 
   <!-- ============================= PRACTICE ============================= -->
@@ -87,7 +91,8 @@
     <div id="conv-room" hidden>
       <div id="conv-room-header">
         <span>Code: <strong id="conv-room-code"></strong></span>
-        <button id="conv-btn-qr" title="Show QR code">QR</button>
+        <button id="conv-btn-qr" title="Show QR code to join with camera">QR</button>
+        <button id="conv-btn-audience-qr" title="Show QR code for the audience to watch live captions">Audience QR</button>
         <button id="conv-btn-leave" title="Leave this conversation">Leave</button>
       </div>
 
@@ -96,11 +101,17 @@
         <p>Scan this on the other phone to join instantly.</p>
       </div>
 
+      <div id="conv-audience-qr" hidden>
+        <div id="conv-audience-qr-box"></div>
+        <p>Audience members scan this to watch live captions on their own phone &mdash; no camera or sign-up needed.</p>
+      </div>
+
       <div id="conv-call">
         <span class="conv-call-label">Them &mdash; live video</span>
         <div id="conv-remote-stage">
           <video id="conv-remote-video" playsinline autoplay></video>
           <div class="hint" id="conv-call-hint">Connecting video call&hellip;</div>
+          <div id="conv-remote-caption"></div>
         </div>
       </div>
 
@@ -124,6 +135,7 @@
         <div id="conv-buffer-row">
           <span class="label">Draft</span>
           <span id="conv-buffer-text">—</span>
+          <button id="conv-btn-autocaption" title="When on, recognized signs stream live as captions and auto-send when you pause">Auto-caption: On</button>
         </div>
         <div id="conv-camera-controls">
           <button id="conv-btn-backspace" title="Remove last word">&#9003;</button>
@@ -144,7 +156,61 @@
     </footer>
   </section>
 
+  <!-- ================================ QUIZ ================================ -->
+  <section id="screen-quiz" hidden>
+    <p class="conv-intro">
+      Pick a mode, tap <strong>Start Quiz</strong>, and sign the word shown on
+      screen as fast as you can &mdash; a fun way for visitors and VIPs to try
+      the recognizer hands-on. 60 seconds per round.
+    </p>
+
+    <nav id="quiz-mode-tabs" aria-label="Choose a mode"></nav>
+
+    <div id="quiz-scoreboard">
+      <div class="quiz-score-box">
+        <span class="quiz-score-label">Score</span>
+        <span id="quiz-score">0</span>
+      </div>
+      <div class="quiz-score-box">
+        <span class="quiz-score-label">Time</span>
+        <span id="quiz-timer">60</span>
+      </div>
+      <div class="quiz-score-box">
+        <span class="quiz-score-label">Best</span>
+        <span id="quiz-best">0</span>
+      </div>
+    </div>
+
+    <div id="quiz-stage">
+      <video id="quiz-video" playsinline autoplay muted></video>
+      <canvas id="quiz-overlay"></canvas>
+      <div class="hint" id="quiz-hint">
+        Tap <strong>Start Quiz</strong> below to begin. Allow camera access when your browser asks.
+      </div>
+      <div id="quiz-target">
+        <span class="quiz-target-label">Show this sign</span>
+        <span id="quiz-target-ar" dir="rtl" lang="ar"></span>
+        <span id="quiz-target-en"></span>
+      </div>
+      <div id="quiz-flash"></div>
+    </div>
+
+    <div id="quiz-result" hidden>
+      <h2 id="quiz-result-title">Time's up!</h2>
+      <p>You scored <strong id="quiz-result-score">0</strong> &mdash; best score on this phone: <strong id="quiz-result-best">0</strong></p>
+    </div>
+
+    <div id="quiz-controls">
+      <button id="quiz-btn-start">Start Quiz</button>
+    </div>
+
+    <footer>
+      Runs fully on this device &mdash; your camera video never leaves your phone.
+    </footer>
+  </section>
+
   <script type="module" src="app.js"></script>
   <script type="module" src="conversation.js"></script>
+  <script type="module" src="quiz.js"></script>
 </body>
 </html>

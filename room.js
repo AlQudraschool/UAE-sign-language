@@ -198,3 +198,47 @@ export async function clearSignaling(code) {
   const db = await getDatabase();
   await db.ref(`rooms/${code}/webrtc`).remove();
 }
+
+// --- Live captions ------------------------------------------------------
+//
+// While someone is signing, their in-progress draft text is written here
+// continuously (not just when they tap Send), so the OTHER phone can show
+// it as a live, streaming caption under the video call -- like TV
+// subtitles -- instead of waiting for a finished message. Used by
+// conversation.js's "Auto-caption" toggle.
+
+let captionRef = null;
+let captionCallback = null;
+
+/** Overwrites this device's current live-caption text for a room (empty string clears it). */
+export async function setCaption(code, deviceId, text) {
+  const db = await getDatabase();
+  await db.ref(`rooms/${code}/captions/${deviceId}`).set({
+    text,
+    ts: window.firebase.database.ServerValue.TIMESTAMP,
+  });
+}
+
+/** Listens for every device's live caption in a room; callback gets { deviceId: text, ... } each time anything changes. */
+export async function listenCaptions(code, callback) {
+  const db = await getDatabase();
+  stopListeningCaptions();
+  captionRef = db.ref(`rooms/${code}/captions`);
+  captionCallback = (snap) => {
+    const byDevice = {};
+    snap.forEach((child) => {
+      const val = child.val() || {};
+      byDevice[child.key] = val.text || '';
+    });
+    callback(byDevice);
+  };
+  captionRef.on('value', captionCallback);
+}
+
+export function stopListeningCaptions() {
+  if (captionRef && captionCallback) {
+    captionRef.off('value', captionCallback);
+  }
+  captionRef = null;
+  captionCallback = null;
+}

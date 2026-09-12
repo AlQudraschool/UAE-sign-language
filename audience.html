@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Live Captions &mdash; UAE Sign Language Recognition</title>
+  <meta name="theme-color" content="#0b1220" />
+  <link rel="icon" href="icons/icon-192.png" />
+  <style>
+    :root {
+      --bg: #0b1220;
+      --panel: #121b2e;
+      --text: #eef2f8;
+      --muted: #93a1b8;
+      --accent: #17c3a2;
+      --accent-2: #d4af37;
+      --border: #263352;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0; height: 100%;
+      background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+    body {
+      display: flex; flex-direction: column;
+      min-height: 100dvh; padding: 20px;
+    }
+    header {
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: 8px; flex-wrap: wrap;
+    }
+    h1 { font-size: 1.1rem; margin: 0; font-weight: 700; }
+    h1 span { color: var(--accent); }
+    #a-meta { color: var(--muted); font-size: 0.85rem; text-align: right; }
+    #a-code { color: var(--accent-2); font-weight: 700; letter-spacing: 0.15em; }
+    #a-status { display: block; font-size: 0.75rem; }
+
+    #a-live-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      margin: 24px 0;
+      min-height: 30vh;
+    }
+    #a-live {
+      font-size: clamp(2rem, 9vw, 6rem);
+      font-weight: 800;
+      line-height: 1.15;
+      color: var(--muted);
+      transition: color 0.2s ease;
+    }
+    #a-live.show { color: var(--text); }
+    #a-live::before {
+      content: 'Waiting for the presenter to sign\2026';
+      display: block;
+      font-size: 1rem;
+      font-weight: 400;
+      color: var(--muted);
+    }
+    #a-live.show::before { content: 'Live now'; color: var(--accent); }
+
+    #a-history {
+      max-height: 24vh;
+      overflow-y: auto;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 16px;
+    }
+    .a-history-row {
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 1.05rem;
+    }
+    .a-history-row:last-child { border-bottom: none; }
+
+    footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.72rem;
+      padding-top: 14px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1><span>UAE</span> Sign Language &mdash; Live Captions</h1>
+    <div id="a-meta">
+      Room <span id="a-code">&hellip;</span>
+      <span id="a-status">Connecting&hellip;</span>
+    </div>
+  </header>
+
+  <div id="a-live-wrap">
+    <div id="a-live"></div>
+  </div>
+
+  <div id="a-history"></div>
+
+  <footer>
+    Read-only audience view &mdash; scan the presenter's Audience QR code to open this on your own phone.
+  </footer>
+
+  <script type="module" src="audience.js"></script>
+</body>
+</html>

@@ -17,9 +17,17 @@ import {
 } from './vision.js';
 import {
   getDeviceId, createRoom, roomExists, sendMessage, listenMessages, stopListening,
-  clearSignaling,
+  clearSignaling, setCaption, listenCaptions, stopListeningCaptions,
 } from './room.js';
 import { startCall } from './webrtc.js';
+import { notifyCommit } from './feedback.js';
+import { speakSign, speakText } from './speech.js';
+
+// How long (ms) to wait after the last recognized sign before auto-sending
+// the draft as a finished message, when Auto-caption is on -- long enough
+// that someone fingerspelling a whole word doesn't get cut off mid-word,
+// short enough that the other phone still sees it feel "live".
+const AUTO_SEND_PAUSE_MS = 2500;
 
 const QR_SCRIPT_URL = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
 let qrLoadPromise = null;
@@ -41,8 +49,10 @@ function loadQrLibrary() {
 const els = {
   tabPractice: document.getElementById('tab-practice'),
   tabConversation: document.getElementById('tab-conversation'),
+  tabQuiz: document.getElementById('tab-quiz'),
   screenPractice: document.getElementById('screen-practice'),
   screenConversation: document.getElementById('screen-conversation'),
+  screenQuiz: document.getElementById('screen-quiz'),
 
   convStart: document.getElementById('conv-start'),
   btnStart: document.getElementById('conv-btn-start'),
@@ -57,12 +67,17 @@ const els = {
   btnShowQr: document.getElementById('conv-btn-qr'),
   qrPanel: document.getElementById('conv-qr'),
   qrBox: document.getElementById('conv-qr-box'),
+  btnShowAudienceQr: document.getElementById('conv-btn-audience-qr'),
+  audienceQrPanel: document.getElementById('conv-audience-qr'),
+  audienceQrBox: document.getElementById('conv-audience-qr-box'),
   btnLeave: document.getElementById('conv-btn-leave'),
 
   messages: document.getElementById('conv-messages'),
 
   remoteVideo: document.getElementById('conv-remote-video'),
   callHint: document.getElementById('conv-call-hint'),
+  remoteCaption: document.getElementById('conv-remote-caption'),
+  btnAutocaption: document.getElementById('conv-btn-autocaption'),
 
   modeTabs: document.getElementById('conv-mode-tabs'),
   video: document.getElementById('conv-video'),
@@ -96,7 +111,12 @@ const state = {
   textBuffer: '',
   lastLabel: null,
   stableCount: 0,
+  committedThisHold: false,
   loopHandle: null,
+  autoCaption: true,
+  autoSendTimer: null,
+  lastSpokenMsgId: null,
+  messagesInitialized: false,
 };
 
 function setStatus(text, kind) {
@@ -108,16 +128,18 @@ function setStatus(text, kind) {
 // --- Screen switching --------------------------------------------------------
 
 function showScreen(name) {
-  const isConv = name === 'conversation';
-  els.tabPractice.classList.toggle('active', !isConv);
-  els.tabConversation.classList.toggle('active', isConv);
-  els.screenPractice.hidden = isConv;
-  els.screenConversation.hidden = !isConv;
+  els.tabPractice.classList.toggle('active', name === 'practice');
+  els.tabConversation.classList.toggle('active', name === 'conversation');
+  if (els.tabQuiz) els.tabQuiz.classList.toggle('active', name === 'quiz');
+  els.screenPractice.hidden = name !== 'practice';
+  els.screenConversation.hidden = name !== 'conversation';
+  if (els.screenQuiz) els.screenQuiz.hidden = name !== 'quiz';
   document.dispatchEvent(new CustomEvent('app:screen-changed', { detail: { screen: name } }));
 }
 
 els.tabPractice.addEventListener('click', () => showScreen('practice'));
 els.tabConversation.addEventListener('click', () => showScreen('conversation'));
+if (els.tabQuiz) els.tabQuiz.addEventListener('click', () => showScreen('quiz'));
 
 document.addEventListener('app:screen-changed', (e) => {
   if (e.detail.screen !== 'conversation') {
@@ -209,12 +231,23 @@ function detectionLoop() {
             state.stableCount += 1;
           } else {
             state.stableCount = 0;
+            state.committedThisHold = false;
           }
           state.lastLabel = prediction.label;
 
-          if (state.stableCount === STABLE_FRAMES_TO_COMMIT && prediction.confidence >= MIN_CONFIDENCE_TO_COMMIT) {
+          // `>=` rather than `===` -- see the long comment in app.js. The
+          // original checked confidence on one single frame of the hold, so
+          // a correctly-recognised sign that was momentarily just under the
+          // threshold never made it into the message.
+          if (!state.committedThisHold
+              && state.stableCount >= STABLE_FRAMES_TO_COMMIT
+              && prediction.confidence >= MIN_CONFIDENCE_TO_COMMIT) {
+            state.committedThisHold = true;
             state.textBuffer += (state.textBuffer ? ' ' : '') + displayEn;
             updateBufferUI();
+            notifyCommit();
+            speakSign(gclass, displayEn);
+            onDraftChanged();
           }
         }
       }
@@ -222,6 +255,7 @@ function detectionLoop() {
       els.chip.classList.remove('show');
       state.lastLabel = null;
       state.stableCount = 0;
+      state.committedThisHold = false;
     }
   }
   state.loopHandle = requestAnimationFrame(detectionLoop);
@@ -244,6 +278,70 @@ function setCallHint(text) {
     els.callHint.style.display = 'flex';
   } else {
     els.callHint.style.display = 'none';
+  }
+}
+
+// --- Live auto-captions ----------------------------------------------------
+//
+// Normally you build up a draft sign-by-sign and tap Send when ready. With
+// Auto-caption ON (the default), every recognized sign is ALSO streamed to
+// the other phone immediately as a live caption -- no waiting, no tapping
+// Send -- and if you pause signing for a couple of seconds, the draft is
+// automatically turned into a real message and the caption clears, ready
+// for the next sentence. This is what makes the video call feel like it
+// has live captions, instead of a chat box next to it.
+
+function setAutocaptionUI() {
+  if (!els.btnAutocaption) return;
+  els.btnAutocaption.textContent = state.autoCaption ? 'Auto-caption: On' : 'Auto-caption: Off';
+  els.btnAutocaption.classList.toggle('on', state.autoCaption);
+}
+
+function onDraftChanged() {
+  if (!state.autoCaption || !state.code) return;
+  // Broadcast the in-progress draft immediately so the other phone can show
+  // it as a streaming caption under the video call.
+  setCaption(state.code, state.deviceId, state.textBuffer).catch(() => {});
+  // Reset the "they paused signing" timer -- when it fires with no new sign
+  // in between, treat the pause as "end of sentence" and send it for real.
+  if (state.autoSendTimer) clearTimeout(state.autoSendTimer);
+  state.autoSendTimer = setTimeout(() => {
+    const text = state.textBuffer.trim();
+    if (text) {
+      doSend(text);
+      state.textBuffer = '';
+      updateBufferUI();
+      setCaption(state.code, state.deviceId, '').catch(() => {});
+    }
+  }, AUTO_SEND_PAUSE_MS);
+}
+
+function clearAutosendTimer() {
+  if (state.autoSendTimer) {
+    clearTimeout(state.autoSendTimer);
+    state.autoSendTimer = null;
+  }
+}
+
+if (els.btnAutocaption) {
+  els.btnAutocaption.addEventListener('click', () => {
+    state.autoCaption = !state.autoCaption;
+    setAutocaptionUI();
+    if (!state.autoCaption) {
+      clearAutosendTimer();
+      if (state.code) setCaption(state.code, state.deviceId, '').catch(() => {});
+    }
+  });
+  setAutocaptionUI();
+}
+
+function showRemoteCaption(text) {
+  if (!els.remoteCaption) return;
+  if (text) {
+    els.remoteCaption.textContent = text;
+    els.remoteCaption.style.display = 'block';
+  } else {
+    els.remoteCaption.style.display = 'none';
   }
 }
 
@@ -334,19 +432,25 @@ els.btnBackspace.addEventListener('click', () => {
   words.pop();
   state.textBuffer = words.join(' ');
   updateBufferUI();
+  clearAutosendTimer();
+  if (state.code) setCaption(state.code, state.deviceId, state.textBuffer).catch(() => {});
 });
 
 els.btnClear.addEventListener('click', () => {
   state.textBuffer = '';
   updateBufferUI();
+  clearAutosendTimer();
+  if (state.code) setCaption(state.code, state.deviceId, '').catch(() => {});
 });
 
 els.btnSendSign.addEventListener('click', () => {
   const text = state.textBuffer.trim();
   if (!text) return;
+  clearAutosendTimer();
   doSend(text);
   state.textBuffer = '';
   updateBufferUI();
+  if (state.code) setCaption(state.code, state.deviceId, '').catch(() => {});
 });
 
 els.btnSendText.addEventListener('click', () => {
@@ -394,12 +498,31 @@ function renderMessages(list) {
     els.messages.appendChild(row);
   });
   els.messages.scrollTop = els.messages.scrollHeight;
+
+  // Read the newest message out loud, but only once, and only if it just
+  // arrived from the OTHER phone -- like a live interpreter speaking what
+  // was signed. `renderMessages` re-runs with the FULL list every time
+  // anything changes, so lastSpokenMsgId stops the same message being
+  // spoken again on every re-render.
+  const last = list[list.length - 1];
+  if (!state.messagesInitialized) {
+    // First load of this room's history (e.g. just joined) -- note the
+    // newest message so it isn't spoken, but don't announce old history.
+    state.messagesInitialized = true;
+    state.lastSpokenMsgId = last ? last.id : null;
+  } else if (last && !last.system && last.from !== state.deviceId && last.id !== state.lastSpokenMsgId) {
+    state.lastSpokenMsgId = last.id;
+    speakText(last.text);
+  } else if (last) {
+    state.lastSpokenMsgId = last.id;
+  }
 }
 
 // --- Start / Join flow ------------------------------------------------------------
 
 function showRoom(code) {
   state.code = code;
+  state.messagesInitialized = false;
   els.convStart.hidden = true;
   els.convRoom.hidden = false;
   els.roomCode.textContent = code;
@@ -408,6 +531,13 @@ function showRoom(code) {
     console.error(err);
     setStatus('could not connect -- check firebase-config.js', 'err');
   });
+  listenCaptions(code, (byDevice) => {
+    const theirText = Object.entries(byDevice)
+      .filter(([id]) => id !== state.deviceId)
+      .map(([, text]) => text)
+      .find((text) => text);
+    showRemoteCaption(theirText || '');
+  }).catch(() => { /* captions are a nice-to-have -- never block the call over this */ });
   beginCall();
 }
 
@@ -475,16 +605,23 @@ els.codeInput.addEventListener('keydown', (e) => {
 els.btnLeave.addEventListener('click', () => {
   const leavingCode = state.code;
   stopListening();
+  stopListeningCaptions();
+  clearAutosendTimer();
   stopCall();
   if (leavingCode) clearSignaling(leavingCode).catch(() => { /* best-effort tidy-up */ });
+  showRemoteCaption('');
   state.code = null;
   state.isCaller = false;
+  state.messagesInitialized = false;
+  state.lastSpokenMsgId = null;
   els.convRoom.hidden = true;
   els.convStart.hidden = false;
   els.joinForm.hidden = true;
   els.codeInput.value = '';
   qrDesiredVisible = false;
   els.qrPanel.hidden = true;
+  qrAudienceDesiredVisible = false;
+  if (els.audienceQrPanel) els.audienceQrPanel.hidden = true;
   // Clear the ?room= link so re-visiting the app doesn't try to auto-join again.
   const url = new URL(location.href);
   url.searchParams.delete('room');
@@ -521,9 +658,49 @@ els.btnShowQr.addEventListener('click', () => {
     els.qrPanel.hidden = true;
   } else {
     qrDesiredVisible = true;
+    if (qrAudienceDesiredVisible) { qrAudienceDesiredVisible = false; els.audienceQrPanel.hidden = true; }
     showQr(state.code);
   }
 });
+
+// --- Audience QR (big-screen live captions) ---------------------------------
+//
+// A SEPARATE code from the join-with-camera QR above: this one points to
+// audience.html, a tiny camera-free page that just shows the conversation's
+// messages and live captions in huge text -- built for a projector, or for
+// dozens of audience members to scan on their own phones during a live
+// demo and follow along, without joining the actual 2-person call. See
+// audience.html and README_WEBAPP.md, "The QR audience-participation demo".
+
+let qrAudienceDesiredVisible = false;
+
+async function showAudienceQr(code) {
+  try {
+    await loadQrLibrary();
+    if (!qrAudienceDesiredVisible) return;
+    els.audienceQrBox.innerHTML = '';
+    const audienceUrl = new URL('audience.html', location.href);
+    audienceUrl.searchParams.set('room', code);
+    // eslint-disable-next-line no-undef
+    new QRCode(els.audienceQrBox, { text: audienceUrl.toString(), width: 180, height: 180 });
+    els.audienceQrPanel.hidden = false;
+  } catch (err) {
+    console.warn('QR code library failed to load for the audience QR.', err);
+  }
+}
+
+if (els.btnShowAudienceQr) {
+  els.btnShowAudienceQr.addEventListener('click', () => {
+    if (qrAudienceDesiredVisible) {
+      qrAudienceDesiredVisible = false;
+      els.audienceQrPanel.hidden = true;
+    } else {
+      qrAudienceDesiredVisible = true;
+      if (qrDesiredVisible) { qrDesiredVisible = false; els.qrPanel.hidden = true; }
+      showAudienceQr(state.code);
+    }
+  });
+}
 
 // --- Init ---------------------------------------------------------------------------
 

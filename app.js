@@ -32,6 +32,8 @@ import {
   getHandLandmarker, landmarksToFeatures, drawLandmarks,
   STABLE_FRAMES_TO_COMMIT, MIN_CONFIDENCE_TO_COMMIT,
 } from './vision.js';
+import { notifyCommit } from './feedback.js';
+import { speakSign } from './speech.js';
 
 const els = {
   statusPill: document.getElementById('status-pill'),
@@ -63,6 +65,7 @@ const state = {
   textBuffer: '',
   lastLabel: null,
   stableCount: 0,
+  committedThisHold: false,
   loopHandle: null,
 };
 
@@ -166,21 +169,39 @@ function detectionLoop() {
           if (prediction.label === state.lastLabel) {
             state.stableCount += 1;
           } else {
+            // A different sign -- start counting again, and allow this new
+            // one to be typed once it settles.
             state.stableCount = 0;
+            state.committedThisHold = false;
           }
           state.lastLabel = prediction.label;
 
-          if (state.stableCount === STABLE_FRAMES_TO_COMMIT && prediction.confidence >= MIN_CONFIDENCE_TO_COMMIT) {
+          // Note `>=`, not `===`. The original only tested confidence on the
+          // single 15th frame of a hold: if the model happened to be a few
+          // points under the threshold at that exact instant, the letter was
+          // never typed, no matter how long you kept holding it. Now the
+          // check keeps running for as long as you hold the sign steady, and
+          // fires the moment confidence is high enough. `committedThisHold`
+          // makes sure that happens once per hold, not once per frame.
+          if (!state.committedThisHold
+              && state.stableCount >= STABLE_FRAMES_TO_COMMIT
+              && prediction.confidence >= MIN_CONFIDENCE_TO_COMMIT) {
+            state.committedThisHold = true;
             state.textBuffer += `${displayEn} `;
             updateBufferUI();
+            notifyCommit();
+            speakSign(gclass, displayEn);
           }
         }
       }
     } else {
+      // Hand left the frame -- reset, so showing the same sign again types
+      // it again (that's how you spell a double letter).
       els.chip.classList.remove('show');
       els.tipBanner.classList.remove('show');
       state.lastLabel = null;
       state.stableCount = 0;
+      state.committedThisHold = false;
     }
   }
 
