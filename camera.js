@@ -82,6 +82,23 @@ export function toggleFacingMode() {
   setFacingMode(facing === 'user' ? 'environment' : 'user');
 }
 
+/**
+ * Flips the setting back WITHOUT announcing it, for when a screen tried to
+ * switch cameras and the phone refused (e.g. a tablet with no rear camera).
+ * The screen that calls this is already putting the old camera back itself,
+ * so firing app:camera-changed again would just start the whole thing over.
+ */
+export function revertFacingMode() {
+  facing = facing === 'user' ? 'environment' : 'user';
+  try {
+    localStorage.setItem(STORAGE_KEY, facing);
+  } catch (err) {
+    /* ignore */
+  }
+  applyBodyAttribute();
+  updateButton();
+}
+
 // Wire the shared toggle button once. Module scripts run after the HTML is
 // parsed, so the button already exists by the time this runs.
 (function initCameraToggle() {

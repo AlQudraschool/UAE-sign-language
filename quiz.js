@@ -21,7 +21,7 @@ import {
 } from './vision.js';
 import { notifyCommit, notifySuccess } from './feedback.js';
 import { speakSign } from './speech.js';
-import { videoConstraints } from './camera.js';
+import { videoConstraints, revertFacingMode } from './camera.js';
 
 const ROUND_SECONDS = 60;
 const BEST_KEY = 'uae-sign-quiz-best';
@@ -296,11 +296,15 @@ function runQuizScreen() {
     if (e.detail.screen !== 'quiz' && state.running) endQuiz(true);
   });
 
-  // Front/back camera switch -- swap the stream over without ending the
-  // round, so nobody loses their score mid-game.
+  // Front/back camera switch -- the round keeps running, so nobody loses
+  // their score. The old camera is released first: phones can only have one
+  // camera open at a time (see the comment in app.js).
   document.addEventListener('app:camera-changed', async () => {
     if (!state.running) return;
-    const previous = state.stream;
+
+    if (state.stream) state.stream.getTracks().forEach((t) => t.stop());
+    state.stream = null;
+
     try {
       state.stream = await navigator.mediaDevices.getUserMedia({
         video: videoConstraints(),
@@ -308,10 +312,19 @@ function runQuizScreen() {
       });
     } catch (err) {
       console.error('Could not switch camera', err);
-      state.stream = previous;
-      return;
+      revertFacingMode();
+      try {
+        state.stream = await navigator.mediaDevices.getUserMedia({
+          video: videoConstraints(),
+          audio: false,
+        });
+      } catch (err2) {
+        console.error('Could not reopen the original camera either', err2);
+        endQuiz(true);
+        return;
+      }
     }
-    if (previous) previous.getTracks().forEach((t) => t.stop());
+
     els.video.srcObject = state.stream;
     await els.video.play().catch(() => {});
     resizeOverlay();

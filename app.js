@@ -34,7 +34,7 @@ import {
 } from './vision.js';
 import { notifyCommit } from './feedback.js';
 import { speakSign } from './speech.js';
-import { videoConstraints } from './camera.js';
+import { videoConstraints, revertFacingMode } from './camera.js';
 
 const els = {
   statusPill: document.getElementById('status-pill'),
@@ -289,11 +289,19 @@ document.addEventListener('app:screen-changed', (e) => {
   if (e.detail.screen !== 'practice' && state.running) stopCamera();
 });
 
-// Front/back camera switch (camera.js). Swaps the live stream over without
-// tearing the screen down, so the text you've already typed survives.
+// Front/back camera switch (camera.js). The text you've already typed
+// survives -- only the camera behind it changes.
+//
+// IMPORTANT: the current camera is stopped BEFORE the other one is opened.
+// Nearly all phones can only have one camera open at a time, so asking for
+// the back camera while the front is still streaming simply fails. (On a
+// laptop it works either way, which is what hid this at first.)
 document.addEventListener('app:camera-changed', async () => {
   if (!state.running) return;
-  const previous = state.stream;
+
+  if (state.stream) state.stream.getTracks().forEach((t) => t.stop());
+  state.stream = null;
+
   try {
     state.stream = await navigator.mediaDevices.getUserMedia({
       video: videoConstraints(),
@@ -301,11 +309,22 @@ document.addEventListener('app:camera-changed', async () => {
     });
   } catch (err) {
     console.error('Could not switch camera', err);
-    state.stream = previous; // keep the camera we already had
-    setStatus('could not switch camera', 'err');
-    return;
+    // This phone can't give us that camera -- go back to the one that was
+    // working rather than leaving the screen black.
+    revertFacingMode();
+    setStatus('this device has no second camera', 'err');
+    try {
+      state.stream = await navigator.mediaDevices.getUserMedia({
+        video: videoConstraints(),
+        audio: false,
+      });
+    } catch (err2) {
+      console.error('Could not reopen the original camera either', err2);
+      stopCamera();
+      return;
+    }
   }
-  if (previous) previous.getTracks().forEach((t) => t.stop());
+
   els.video.srcObject = state.stream;
   await els.video.play().catch(() => {});
   resizeOverlayToVideo();

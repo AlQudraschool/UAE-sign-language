@@ -22,7 +22,7 @@ import {
 import { startCall } from './webrtc.js';
 import { notifyCommit } from './feedback.js';
 import { speakSign, speakText } from './speech.js';
-import { videoConstraints } from './camera.js';
+import { videoConstraints, revertFacingMode } from './camera.js';
 
 // How long (ms) to wait after the last recognized sign before auto-sending
 // the draft as a finished message, when Auto-caption is on -- long enough
@@ -149,6 +149,16 @@ if (els.tabQuiz) els.tabQuiz.addEventListener('click', () => showScreen('quiz'))
 // the local camera still switches; only the far end keeps the old view.
 document.addEventListener('app:camera-changed', async () => {
   if (!state.stream) return;
+
+  // Release the camera BEFORE opening the other one -- phones can only run
+  // one camera at a time (see app.js). Only the video track is stopped: the
+  // microphone keeps running, so the call's audio never drops.
+  const oldTrack = state.stream.getVideoTracks()[0];
+  if (oldTrack) {
+    state.stream.removeTrack(oldTrack);
+    oldTrack.stop();
+  }
+
   let newStream;
   try {
     newStream = await navigator.mediaDevices.getUserMedia({
@@ -157,8 +167,17 @@ document.addEventListener('app:camera-changed', async () => {
     });
   } catch (err) {
     console.error('Could not switch camera', err);
-    setStatus('could not switch camera', 'err');
-    return;
+    revertFacingMode();
+    setStatus('this device has no second camera', 'err');
+    try {
+      newStream = await navigator.mediaDevices.getUserMedia({
+        video: videoConstraints(),
+        audio: false,
+      });
+    } catch (err2) {
+      console.error('Could not reopen the original camera either', err2);
+      return;
+    }
   }
 
   const newTrack = newStream.getVideoTracks()[0];
@@ -172,11 +191,6 @@ document.addEventListener('app:camera-changed', async () => {
     }
   }
 
-  const oldTrack = state.stream.getVideoTracks()[0];
-  if (oldTrack) {
-    state.stream.removeTrack(oldTrack);
-    oldTrack.stop();
-  }
   state.stream.addTrack(newTrack);
   els.video.srcObject = state.stream;
   await els.video.play().catch(() => {});
