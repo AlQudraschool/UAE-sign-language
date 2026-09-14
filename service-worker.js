@@ -11,7 +11,7 @@
  * converted) will keep working offline after that first visit.
  */
 
-const CACHE_NAME = 'uae-sign-language-v6';
+const CACHE_NAME = 'uae-sign-language-v8';
 const APP_SHELL = [
   './',
   './index.html',
@@ -26,6 +26,7 @@ const APP_SHELL = [
   './speech.js',
   './feedback.js',
   './camera.js',
+  './welcome.js',
   './quiz.js',
   './audience.js',
   './firebase-config.js',
@@ -58,18 +59,28 @@ self.addEventListener('fetch', (event) => {
   // camera stream, etc.) go straight to the network untouched.
   if (event.request.method !== 'GET' || url.origin !== self.location.origin) return;
 
+  // NETWORK FIRST, cache as the fallback.
+  //
+  // This used to be the other way round (serve the saved copy instantly,
+  // fetch a fresh one in the background for NEXT time). That's faster, but
+  // it means every update needs two reloads before you see it -- and in
+  // practice that repeatedly looked like "the upload didn't work" when the
+  // upload was fine and the phone was just showing yesterday's copy. Before
+  // a live demo, that's a genuinely bad way to lose twenty minutes.
+  //
+  // Now the phone always asks the network first, so what you see is what was
+  // last uploaded. The saved copy is still kept and used whenever the
+  // network fails, so the app still opens with no internet -- it just isn't
+  // allowed to serve a stale page when a fresh one is available.
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const network = fetch(event.request)
-        .then((response) => {
-          if (response.ok) {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-          }
-          return response;
-        })
-        .catch(() => cached);
-      return cached || network;
-    })
+    fetch(event.request)
+      .then((response) => {
+        if (response.ok) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        }
+        return response;
+      })
+      .catch(() => caches.match(event.request))
   );
 });

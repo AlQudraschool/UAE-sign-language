@@ -3,7 +3,9 @@
   --panel: #121b2e;
   --panel-2: #182338;
   --text: #eef2f8;
-  --muted: #93a1b8;
+  /* Lightened from #93a1b8 so secondary text clears the WCAG AA contrast
+     ratio against the dark background, not just "looks fine on my phone". */
+  --muted: #a9b6cb;
   --accent: #17c3a2;      /* teal - primary */
   --accent-2: #d4af37;    /* gold - UAE / Arabic modes */
   --accent-3: #ef476f;    /* rose - alerts / clear */
@@ -22,6 +24,144 @@ html, body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   height: 100%;
   overflow-x: hidden;
+  /* Base size raised from the browser default. This app is built for
+     People of Determination, some of whom have low vision, so small text
+     would be a contradiction. Everything else is sized in rem from here,
+     so this one value scales the whole interface. */
+  font-size: 17px;
+  line-height: 1.5;
+}
+
+/* Anything focused by keyboard gets a clearly visible ring. Without this,
+   someone navigating by keyboard or switch device cannot see where they
+   are -- the browser default outline is invisible on a dark background. */
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ---------------------------- Welcome screen ---------------------------- */
+#welcome {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(5, 9, 17, 0.9);
+  backdrop-filter: blur(6px);
+  overflow-y: auto;
+}
+#welcome.gone { display: none; }
+
+.welcome-card {
+  width: 100%;
+  max-width: 420px;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--border);
+  border-top: 4px solid var(--accent-2);
+  border-radius: 18px;
+  padding: 26px 22px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.welcome-school {
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-2);
+}
+
+.welcome-card h2 {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+.welcome-card .w-ar {
+  direction: rtl;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--accent-2);
+}
+.welcome-card .w-en {
+  font-size: 1.55rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.welcome-card .w-en em {
+  font-style: normal;
+  color: var(--accent);
+}
+
+.welcome-lede {
+  margin: 0;
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.welcome-points {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding-block: 14px;
+}
+.welcome-points li {
+  color: var(--muted);
+  font-size: 0.9rem;
+  padding-inline-start: 18px;
+  position: relative;
+}
+.welcome-points li::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: 0;
+  top: 0.55em;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.welcome-points b { color: var(--text); font-weight: 700; }
+
+.welcome-start {
+  width: 100%;
+  background: var(--accent);
+  color: #06251f;
+  font-size: 1.05rem;
+  padding: 16px;
+  border-radius: 12px;
+}
+
+.welcome-team {
+  margin: 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.welcome-team strong { color: var(--text); font-weight: 600; }
+
+#about-toggle {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 body {
@@ -113,16 +253,20 @@ body[data-facing="environment"] #quiz-overlay {
   border: 1px solid var(--border);
   color: var(--muted);
   border-radius: 10px;
+  /* 48px minimum height: the smallest target most accessibility guidance
+     considers reliably tappable, including for someone with a tremor or
+     limited fine motor control. */
+  min-height: 48px;
   padding: 8px 4px;
-  font-size: 0.68rem;
-  line-height: 1.25;
+  font-size: 0.72rem;
+  line-height: 1.22;
   text-align: center;
   cursor: pointer;
 }
 
 .mode-tab .num {
   display: block;
-  font-size: 0.9rem;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--text);
 }
@@ -184,25 +328,33 @@ body[data-facing="environment"] #quiz-overlay {
   padding: 8px 12px;
 }
 #prediction-chip.show { display: flex; }
+/* The recognised sign is the single most important thing this app says,
+   and it gets read at arm's length rather than close up -- so it is set
+   much larger than anything else on the screen. */
 #pred-ar {
   direction: rtl;
-  font-size: 1.15rem;
+  font-size: 1.8rem;
   font-weight: 700;
   color: var(--accent-2);
+  line-height: 1.2;
 }
 #pred-en {
-  font-size: 1.05rem;
-  font-weight: 700;
+  font-size: 1.9rem;
+  font-weight: 800;
   color: var(--accent);
+  line-height: 1.15;
 }
-#pred-conf { font-size: 0.72rem; color: var(--muted); }
+#pred-conf { font-size: 0.8rem; color: var(--muted); }
 
 /* --- Mode info + tip --------------------------------------------------- */
 #mode-info {
   padding: 10px 16px 0;
 }
 #mode-info .name-en { font-weight: 700; font-size: 1rem; }
-#mode-info .name-ar { direction: rtl; color: var(--accent-2); font-size: 0.95rem; margin-inline-start: 8px; }
+/* margin-LEFT, not margin-inline-start: this span is dir="rtl", so its
+   inline-start is the right edge and the gap would land on the wrong side,
+   leaving the English and Arabic names touching. The page itself is LTR. */
+#mode-info .name-ar { direction: rtl; color: var(--accent-2); font-size: 0.95rem; margin-left: 10px; }
 #mode-info .desc { color: var(--muted); font-size: 0.78rem; margin-top: 2px; }
 
 #tip-banner {
@@ -251,10 +403,18 @@ button {
   font: inherit;
   border: none;
   border-radius: 10px;
+  /* Every button clears 48px, so nothing in the app needs a precise tap. */
+  min-height: 48px;
   padding: 12px 14px;
   font-weight: 700;
-  font-size: 0.85rem;
+  font-size: 0.92rem;
   cursor: pointer;
+}
+
+/* The small pill controls in the top bar are deliberately exempt: they sit
+   in a tight row and are secondary to everything else on screen. */
+#about-toggle, #camera-toggle, #voice-toggle, #conv-btn-autocaption {
+  min-height: 0;
 }
 
 #btn-start {
@@ -301,9 +461,10 @@ footer {
   border: 1px solid var(--border);
   color: var(--muted);
   border-radius: 10px;
+  min-height: 52px;
   padding: 10px 8px;
   font-weight: 700;
-  font-size: 0.85rem;
+  font-size: 0.95rem;
 }
 
 .screen-tab.active {

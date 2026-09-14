@@ -15,9 +15,48 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+
+  <!-- ============================== WELCOME ==============================
+       Shown every time the app opens, on purpose: at an exhibition stand a
+       different person picks up the phone every few minutes, and each of
+       them needs to know what this is before they see a camera pointed at
+       their face. Tap Start to dismiss it; the "About" button in the top
+       bar brings it back.
+
+       EDIT THE TEAM NAMES BELOW -- look for data-edit="team".              -->
+  <div id="welcome" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
+    <div class="welcome-card">
+      <p class="welcome-school">Al Qudra Cycle 3 School &middot; Abu Dhabi</p>
+
+      <h2 id="welcome-title">
+        <span class="w-ar" dir="rtl" lang="ar">لغة الإشارة</span>
+        <span class="w-en">Sign Language, <em>spoken aloud</em></span>
+      </h2>
+
+      <p class="welcome-lede">
+        Show a sign to the camera. The phone reads it, writes it down, and
+        says it out loud &mdash; in both English and Arabic.
+      </p>
+
+      <ul class="welcome-points">
+        <li><b>Two alphabets.</b> American and Arabic Sign Language.</li>
+        <li><b>Two phones can talk.</b> One person signs, the other reads and hears it.</li>
+        <li><b>Nothing leaves your phone.</b> The camera video is never uploaded.</li>
+      </ul>
+
+      <button id="welcome-start" class="welcome-start">Start</button>
+
+      <p class="welcome-team" data-edit="team">
+        Built by <strong>Khaled Rashed</strong>, <strong>Mohammed Tareq</strong> and
+        <strong>Dhahi Faisal</strong>, Grade 12
+      </p>
+    </div>
+  </div>
+
   <header class="topbar">
     <h1><span class="accent">UAE</span> Sign Language Recognition</h1>
     <div class="topbar-right">
+      <button id="about-toggle" title="What is this app?">About</button>
       <button id="camera-toggle" title="Switch between the front (selfie) and back camera">🤳 Front</button>
       <button id="voice-toggle" title="Read recognized signs and messages out loud, in English and Arabic">🔊 Voice: On</button>
       <span id="status-pill">loading&hellip;</span>
@@ -37,9 +76,12 @@
     <div id="stage">
       <video id="video" playsinline autoplay muted></video>
       <canvas id="overlay"></canvas>
+      <!-- The text is wrapped in a single <span> on purpose: .hint is a flex
+           container, so a bare <strong> beside loose text becomes its own
+           flex item and the sentence breaks into pieces. -->
       <div class="hint" id="hint">
-        Tap <strong>Start Camera</strong> below to begin. Allow camera access when your
-        browser asks.
+        <span>Tap <strong>Start Camera</strong> below to begin. Allow camera access when your
+        browser asks.</span>
       </div>
       <div id="prediction-chip">
         <span id="pred-ar" dir="rtl" lang="ar"></span>
@@ -186,7 +228,7 @@
       <video id="quiz-video" playsinline autoplay muted></video>
       <canvas id="quiz-overlay"></canvas>
       <div class="hint" id="quiz-hint">
-        Tap <strong>Start Quiz</strong> below to begin. Allow camera access when your browser asks.
+        <span>Tap <strong>Start Quiz</strong> below to begin. Allow camera access when your browser asks.</span>
       </div>
       <div id="quiz-target">
         <span class="quiz-target-label">Show this sign</span>
@@ -210,6 +252,7 @@
     </footer>
   </section>
 
+  <script type="module" src="welcome.js"></script>
   <script type="module" src="camera.js"></script>
   <script type="module" src="app.js"></script>
   <script type="module" src="conversation.js"></script>
