@@ -1,133 +1,215 @@
 /**
- * modes.js
+ * speech.js
  * -----------------------------------------------------------------------
- * JavaScript port of the Python project's modes.py. This is the SAME data
- * -- same class labels, same English/Arabic display text, same tips --
- * just written so the web app can use it. If you edit modes.py (add a
- * class, change a label, tweak a tip), copy the change here too, or the
- * desktop app and the phone app will disagree with each other.
+ * Spoken voice output -- reads recognized signs (and incoming Conversation
+ * messages) out loud, in English and Arabic, using the browser's built-in
+ * `speechSynthesis` API. No external service, no API key, no cost, and it
+ * keeps working with no internet connection on most phones (the voices
+ * are installed as part of the OS/browser).
  *
- * Labels (the `label` field) MUST exactly match the folder names / class
- * names produced by the Python pipeline (collect_imgs.py, create_dataset.py,
- * train_classifier.py), because convert_models_to_js.py reads the trained
- * model's own class list -- it does not use this file to decide label
- * names. This file is only for what to SHOW on screen for each label.
+ * Shared by app.js (Practice), conversation.js (Conversation), and
+ * quiz.js (Quiz) -- one voice on/off toggle for the whole app, wired here
+ * once against the "#voice-toggle" button in the top bar (see index.html).
+ *
+ * THREE BUGS THIS FILE USED TO HAVE, and why the Arabic mode was silent:
+ *
+ *   1. We spoke the bare letter glyph. `displayAr` for Arabic Sign Language
+ *      is a single character -- "ا" -- and text-to-speech engines say
+ *      NOTHING for a lone letter. modes.js now carries `speakAr` with the
+ *      letter's spoken name ("ألف") and we use that when it exists.
+ *
+ *   2. We called speak() in the same tick as cancel(). On Android Chrome
+ *      that reliably drops the utterance, so whichever half came second --
+ *      the Arabic half -- vanished. We now cancel, then speak on the next
+ *      timer tick, and chain the second utterance off the first one's
+ *      `onend` instead of queueing both at once.
+ *
+ *   3. We read the voice list too early. getVoices() returns an EMPTY array
+ *      on first call in Chrome until the `voiceschanged` event fires, so
+ *      pickVoice() found no Arabic voice, left `utter.voice` unset, and some
+ *      Android builds then read Arabic text with an English voice, which
+ *      produces silence. We now prime the list and re-read it every time.
+ *
+ * REMAINING HONEST LIMITATION: if a phone genuinely has no Arabic voice
+ * installed, nothing here can conjure one. `hasArabicVoice()` reports that
+ * so the UI can say so rather than appearing broken -- test the demo phone,
+ * and if it has no Arabic voice, install one from the system settings
+ * (Android: Settings > Languages & input > Text-to-speech).
  */
 
-const ASL_CLASSES = [
-  ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map((c) => ({ label: c, displayEn: c, displayAr: null, tip: null })),
-  ...'0123456789'.split('').map((d) => ({ label: d, displayEn: d, displayAr: null, tip: null })),
-];
+const STORAGE_KEY = 'uae-sign-voice-enabled';
+const supported = typeof window !== 'undefined' && 'speechSynthesis' in window;
 
-// Columns: label, English name, the letter to SHOW, the words to SPEAK in Arabic.
-//
-// The fourth column exists because of a real bug: we used to hand the bare
-// letter -- "ا" -- straight to the phone's Arabic voice, and text-to-speech
-// engines say nothing at all for a lone letter glyph. On screen you want the
-// letter; out loud you want its NAME ("ألف"). Same reason the digits below
-// speak as words rather than as the numeral "٠".
-const ARABIC_LETTERS = [
-  ['alef', 'Alef', 'ا', 'ألف'], ['baa', 'Baa', 'ب', 'باء'], ['taa', 'Taa', 'ت', 'تاء'],
-  ['thaa', 'Thaa', 'ث', 'ثاء'], ['jeem', 'Jeem', 'ج', 'جيم'], ['haa', 'Haa', 'ح', 'حاء'],
-  ['khaa', 'Khaa', 'خ', 'خاء'], ['dal', 'Dal', 'د', 'دال'], ['thal', 'Thal', 'ذ', 'ذال'],
-  ['raa', 'Raa', 'ر', 'راء'], ['zay', 'Zay', 'ز', 'زاي'], ['seen', 'Seen', 'س', 'سين'],
-  ['sheen', 'Sheen', 'ش', 'شين'], ['sad', 'Sad', 'ص', 'صاد'], ['dad', 'Dad', 'ض', 'ضاد'],
-  ['tah', 'Tah', 'ط', 'طاء'], ['zah', 'Zah', 'ظ', 'ظاء'], ['ain', 'Ain', 'ع', 'عين'],
-  ['ghain', 'Ghain', 'غ', 'غين'], ['faa', 'Faa', 'ف', 'فاء'], ['qaf', 'Qaf', 'ق', 'قاف'],
-  ['kaf', 'Kaf', 'ك', 'كاف'], ['lam', 'Lam', 'ل', 'لام'], ['meem', 'Meem', 'م', 'ميم'],
-  ['noon', 'Noon', 'ن', 'نون'], ['heh', 'Heh', 'ه', 'هاء'], ['waw', 'Waw', 'و', 'واو'],
-  ['yaa', 'Yaa', 'ي', 'ياء'],
-];
-const ARABIC_INDIC_DIGITS = '٠١٢٣٤٥٦٧٨٩'; // U+0660..U+0669, index === digit value
-const ARABIC_DIGIT_WORDS = [
-  'صفر', 'واحد', 'اثنان', 'ثلاثة', 'أربعة', 'خمسة', 'ستة', 'سبعة', 'ثمانية', 'تسعة',
-];
-
-const ARSL_CLASSES = [
-  ...ARABIC_LETTERS.map(([label, en, ar, sayAr]) => ({
-    label, displayEn: en, displayAr: ar, speakAr: sayAr, tip: null,
-  })),
-  ...Array.from({ length: 10 }, (_, d) => ({
-    label: `raqm${d}`, displayEn: String(d), displayAr: ARABIC_INDIC_DIGITS[d],
-    speakAr: ARABIC_DIGIT_WORDS[d], tip: null,
-  })),
-];
-
-// Each word is one held ASL handshape, so a whole word is a single sign
-// instead of being spelled out letter by letter. The fourth column is that
-// handshape -- shown in the app as a tip, and used by
-// build_needs_from_asl.py to assemble the training photos from data/ASL/.
-// Keep this list in step with _NEEDS in ../modes.py.
-const NEEDS_RAW = [
-  ['water', 'Water', 'ماء', 'W'],
-  ['food', 'Food', 'طعام', 'F'],
-  ['help', 'Help', 'مساعدة', 'K'],
-  ['pain', 'Pain', 'ألم', 'P'],
-  ['doctor', 'Doctor', 'طبيب', 'D'],
-  ['medicine', 'Medicine', 'دواء', 'L'],
-  ['bathroom', 'Bathroom', 'حمام', 'B'],
-  ['yes', 'Yes', 'نعم', 'S'],
-  ['no', 'No', 'لا', 'X'],
-  ['thankyou', 'Thank You', 'شكراً', 'G'],
-  ['please', 'Please', 'من فضلك', 'R'],
-  ['sorry', 'Sorry', 'آسف', 'I'],
-  ['wait', 'Wait', 'انتظر', '5'],
-  ['stop', 'Stop', 'توقف', '4'],
-  ['where', 'Where', 'أين', 'V'],
-  ['family', 'Family', 'عائلة', 'C'],
-  ['money', 'Money', 'مال', 'O'],
-  ['phone', 'Phone', 'هاتف', 'Y'],
-  ['tired', 'Tired', 'تعب', '7'],
-  ['emergency', 'Emergency', 'طوارئ', '8'],
-];
-const NEEDS_CLASSES = NEEDS_RAW.map(([label, en, ar, shape]) => ({
-  label, displayEn: en, displayAr: ar, tip: `Hold the ASL "${shape}" handshape`,
-}));
-
-const ETIQUETTE_RAW = [
-  ['heart', 'Hand Over Heart', 'اليد على القلب',
-    'Placing your right hand over your heart is a warm, respectful way to greet someone or say thank you in the UAE, especially when a handshake is not appropriate.'],
-  ['right_hand', 'Right-Hand Giving', 'اليد اليمنى',
-    'It is customary in the UAE to give and receive items -- and to shake hands -- using the right hand.'],
-  ['thumbsup', 'Thumbs Up', 'إبهام لأعلى',
-    'A thumbs-up is a friendly, positive gesture in the UAE.'],
-  ['palmwait', 'Please Wait', 'انتظر من فضلك',
-    'An open palm facing outward is a polite way to ask someone to wait a moment.'],
-  ['beckon', 'Beckoning Someone Over', 'تعال من فضلك',
-    'When calling someone over, a palm-down waving motion is generally seen as more polite than palm-up beckoning across much of the Gulf region.'],
-];
-const ETIQUETTE_CLASSES = ETIQUETTE_RAW.map(([label, en, ar, tip]) => ({ label, displayEn: en, displayAr: ar, tip }));
-
-export const MODES = [
-  {
-    id: 'asl', key: '1',
-    nameEn: 'American Sign Language', nameAr: 'لغة الإشارة الأمريكية',
-    description: 'Fingerspelled ASL alphabet (A-Z) and digits (0-9).',
-    classes: ASL_CLASSES,
-  },
-  {
-    id: 'arsl', key: '2',
-    nameEn: 'Arabic Sign Language', nameAr: 'لغة الإشارة العربية',
-    description: 'Arabic manual alphabet (28 letters) and Arabic-Indic numerals (0-9).',
-    classes: ARSL_CLASSES,
-  },
-  {
-    id: 'needs', key: '3',
-    nameEn: 'Essential Needs', nameAr: 'الاحتياجات الأساسية',
-    description: 'One held handshape per word -- ask for water, help or a doctor with a single sign.',
-    classes: NEEDS_CLASSES,
-  },
-  {
-    id: 'etiquette', key: '4',
-    nameEn: 'UAE Etiquette Gestures', nameAr: 'آداب التحية الإماراتية',
-    description: 'Common Gulf/Emirati greeting gestures with a cultural tip for each.',
-    classes: ETIQUETTE_CLASSES,
-  },
-];
-
-export const MODES_BY_ID = Object.fromEntries(MODES.map((m) => [m.id, m]));
-
-/** Look up display info for a predicted label within a given mode. */
-export function lookupClass(mode, label) {
-  return mode.classes.find((c) => c.label === label) || null;
+let enabled = true;
+try {
+  enabled = supported && localStorage.getItem(STORAGE_KEY) !== 'off';
+} catch (err) {
+  /* localStorage can be unavailable (e.g. private browsing) -- default to on */
 }
+
+/* ------------------------------------------------------------------ voices */
+
+let voiceCache = [];
+
+function refreshVoices() {
+  if (!supported) return;
+  const list = window.speechSynthesis.getVoices();
+  if (list && list.length) voiceCache = list;
+}
+
+/** Best voice for a language prefix ('en' / 'ar'), or null if none installed. */
+function pickVoice(langPrefix) {
+  if (!supported) return null;
+  refreshVoices();
+  const wanted = langPrefix.toLowerCase();
+  // Prefer a local (offline) voice -- on a phone at an exhibition, a
+  // network voice is the one that fails when the wifi is busy.
+  const matches = voiceCache.filter(
+    (v) => v.lang && v.lang.toLowerCase().replace('_', '-').startsWith(wanted)
+  );
+  if (!matches.length) return null;
+  return matches.find((v) => v.localService) || matches[0];
+}
+
+export function hasArabicVoice() {
+  return pickVoice('ar') !== null;
+}
+
+/* ----------------------------------------------------------------- speaking */
+
+/**
+ * Speaks a list of [text, lang] pairs one after another.
+ *
+ * Deliberately chained through `onend` rather than queued: queueing two
+ * utterances in different languages back-to-back is exactly the case Android
+ * Chrome drops, and it was why the Arabic half never played.
+ */
+function speakSequence(parts) {
+  if (!supported || !enabled || !parts.length) return;
+
+  window.speechSynthesis.cancel();
+
+  const next = (i) => {
+    if (i >= parts.length) return;
+    const [text, lang] = parts[i];
+    if (!text) { next(i + 1); return; }
+
+    const utter = new SpeechSynthesisUtterance(String(text));
+    utter.lang = lang;
+    const voice = pickVoice(lang.split('-')[0]);
+    if (voice) utter.voice = voice;
+    utter.rate = 0.95;
+
+    let moved = false;
+    const go = () => { if (!moved) { moved = true; next(i + 1); } };
+    utter.onend = go;
+    utter.onerror = go;
+    // Belt and braces: if the engine never fires onend (it happens), don't
+    // strand the rest of the sequence.
+    setTimeout(go, 2600);
+
+    window.speechSynthesis.speak(utter);
+  };
+
+  // A short gap after cancel() -- speaking in the same tick as a cancel is
+  // silently dropped on Android Chrome.
+  setTimeout(() => next(0), 60);
+}
+
+export function isVoiceSupported() {
+  return supported;
+}
+
+export function isVoiceOn() {
+  return enabled;
+}
+
+export function setVoiceOn(on) {
+  enabled = on;
+  try {
+    localStorage.setItem(STORAGE_KEY, on ? 'on' : 'off');
+  } catch (err) {
+    /* ignore -- toggle still works for the rest of this session */
+  }
+  if (!on && supported) window.speechSynthesis.cancel();
+  updateButton();
+}
+
+/**
+ * Speaks a recognized sign out loud.
+ *
+ * Arabic goes FIRST when the sign has an Arabic form. If you are in Arabic
+ * mode, the Arabic is the answer you are waiting for -- hearing "Alef" before
+ * "ألف" made the app feel like an English app with a translation bolted on.
+ *
+ * `speakAr` (the letter's NAME) is used in preference to `displayAr` (the
+ * letter glyph), because a glyph on its own is silent. Modes whose Arabic is
+ * already a real word -- Essential Needs, UAE Etiquette -- have no `speakAr`
+ * and fall through to `displayAr`, which speaks correctly as-is.
+ */
+export function speakSign(gclass, displayEn) {
+  if (!enabled || !supported) return;
+  const arabic = gclass && (gclass.speakAr || gclass.displayAr);
+  const parts = [];
+  if (arabic) parts.push([arabic, 'ar-SA']);
+  if (displayEn) parts.push([displayEn, 'en-US']);
+  speakSequence(parts);
+}
+
+/** Speaks an arbitrary line of text out loud (incoming Conversation messages). */
+export function speakText(text, lang = 'en-US') {
+  if (!enabled || !supported || !text) return;
+  speakSequence([[text, lang]]);
+}
+
+/* -------------------------------------------------------------- the button */
+
+function updateButton() {
+  const btn = document.getElementById('voice-toggle');
+  if (!btn) return;
+  if (!supported) {
+    btn.textContent = '🔇 Voice unsupported';
+    btn.disabled = true;
+    return;
+  }
+  btn.textContent = enabled ? '🔊 Voice: On' : '🔇 Voice: Off';
+  btn.classList.toggle('on', enabled);
+  btn.title = hasArabicVoice()
+    ? 'Reads recognized signs and messages out loud, in English and Arabic'
+    : 'Reads signs out loud. This phone has no Arabic voice installed, '
+      + 'so only the English half will be heard.';
+}
+
+// Wire the shared toggle button once. Module scripts run after the HTML is
+// parsed (same timing as a `defer` script), so the button already exists
+// in the DOM by the time this runs -- no need to wait for DOMContentLoaded.
+(function initToggleButton() {
+  refreshVoices();
+  updateButton();
+
+  const btn = document.getElementById('voice-toggle');
+  if (btn && !btn.dataset.wired) {
+    btn.dataset.wired = '1';
+    btn.addEventListener('click', () => setVoiceOn(!enabled));
+  }
+
+  if (supported) {
+    // Chrome builds the voice list asynchronously. Listen for it, and also
+    // poll briefly, because a few Android builds never fire the event.
+    if ('onvoiceschanged' in window.speechSynthesis) {
+      window.speechSynthesis.addEventListener('voiceschanged', () => {
+        refreshVoices();
+        updateButton();
+      });
+    }
+    let tries = 0;
+    const timer = setInterval(() => {
+      refreshVoices();
+      tries += 1;
+      if (voiceCache.length || tries > 20) {
+        clearInterval(timer);
+        updateButton();
+      }
+    }, 250);
+  }
+})();
