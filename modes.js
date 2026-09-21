@@ -19,46 +19,70 @@ const ASL_CLASSES = [
   ...'0123456789'.split('').map((d) => ({ label: d, displayEn: d, displayAr: null, tip: null })),
 ];
 
+// Columns: label, English name, the letter to SHOW, the words to SPEAK in Arabic.
+//
+// The fourth column exists because of a real bug: we used to hand the bare
+// letter -- "ا" -- straight to the phone's Arabic voice, and text-to-speech
+// engines say nothing at all for a lone letter glyph. On screen you want the
+// letter; out loud you want its NAME ("ألف"). Same reason the digits below
+// speak as words rather than as the numeral "٠".
 const ARABIC_LETTERS = [
-  ['alef', 'Alef', 'ا'], ['baa', 'Baa', 'ب'], ['taa', 'Taa', 'ت'],
-  ['thaa', 'Thaa', 'ث'], ['jeem', 'Jeem', 'ج'], ['haa', 'Haa', 'ح'],
-  ['khaa', 'Khaa', 'خ'], ['dal', 'Dal', 'د'], ['thal', 'Thal', 'ذ'],
-  ['raa', 'Raa', 'ر'], ['zay', 'Zay', 'ز'], ['seen', 'Seen', 'س'],
-  ['sheen', 'Sheen', 'ش'], ['sad', 'Sad', 'ص'], ['dad', 'Dad', 'ض'],
-  ['tah', 'Tah', 'ط'], ['zah', 'Zah', 'ظ'], ['ain', 'Ain', 'ع'],
-  ['ghain', 'Ghain', 'غ'], ['faa', 'Faa', 'ف'], ['qaf', 'Qaf', 'ق'],
-  ['kaf', 'Kaf', 'ك'], ['lam', 'Lam', 'ل'], ['meem', 'Meem', 'م'],
-  ['noon', 'Noon', 'ن'], ['heh', 'Heh', 'ه'], ['waw', 'Waw', 'و'],
-  ['yaa', 'Yaa', 'ي'],
+  ['alef', 'Alef', 'ا', 'ألف'], ['baa', 'Baa', 'ب', 'باء'], ['taa', 'Taa', 'ت', 'تاء'],
+  ['thaa', 'Thaa', 'ث', 'ثاء'], ['jeem', 'Jeem', 'ج', 'جيم'], ['haa', 'Haa', 'ح', 'حاء'],
+  ['khaa', 'Khaa', 'خ', 'خاء'], ['dal', 'Dal', 'د', 'دال'], ['thal', 'Thal', 'ذ', 'ذال'],
+  ['raa', 'Raa', 'ر', 'راء'], ['zay', 'Zay', 'ز', 'زاي'], ['seen', 'Seen', 'س', 'سين'],
+  ['sheen', 'Sheen', 'ش', 'شين'], ['sad', 'Sad', 'ص', 'صاد'], ['dad', 'Dad', 'ض', 'ضاد'],
+  ['tah', 'Tah', 'ط', 'طاء'], ['zah', 'Zah', 'ظ', 'ظاء'], ['ain', 'Ain', 'ع', 'عين'],
+  ['ghain', 'Ghain', 'غ', 'غين'], ['faa', 'Faa', 'ف', 'فاء'], ['qaf', 'Qaf', 'ق', 'قاف'],
+  ['kaf', 'Kaf', 'ك', 'كاف'], ['lam', 'Lam', 'ل', 'لام'], ['meem', 'Meem', 'م', 'ميم'],
+  ['noon', 'Noon', 'ن', 'نون'], ['heh', 'Heh', 'ه', 'هاء'], ['waw', 'Waw', 'و', 'واو'],
+  ['yaa', 'Yaa', 'ي', 'ياء'],
 ];
 const ARABIC_INDIC_DIGITS = '٠١٢٣٤٥٦٧٨٩'; // U+0660..U+0669, index === digit value
+const ARABIC_DIGIT_WORDS = [
+  'صفر', 'واحد', 'اثنان', 'ثلاثة', 'أربعة', 'خمسة', 'ستة', 'سبعة', 'ثمانية', 'تسعة',
+];
 
 const ARSL_CLASSES = [
-  ...ARABIC_LETTERS.map(([label, en, ar]) => ({ label, displayEn: en, displayAr: ar, tip: null })),
+  ...ARABIC_LETTERS.map(([label, en, ar, sayAr]) => ({
+    label, displayEn: en, displayAr: ar, speakAr: sayAr, tip: null,
+  })),
   ...Array.from({ length: 10 }, (_, d) => ({
-    label: `raqm${d}`, displayEn: String(d), displayAr: ARABIC_INDIC_DIGITS[d], tip: null,
+    label: `raqm${d}`, displayEn: String(d), displayAr: ARABIC_INDIC_DIGITS[d],
+    speakAr: ARABIC_DIGIT_WORDS[d], tip: null,
   })),
 ];
 
+// Each word is one held ASL handshape, so a whole word is a single sign
+// instead of being spelled out letter by letter. The fourth column is that
+// handshape -- shown in the app as a tip, and used by
+// build_needs_from_asl.py to assemble the training photos from data/ASL/.
+// Keep this list in step with _NEEDS in ../modes.py.
 const NEEDS_RAW = [
-  ['water', 'Water', 'ماء'],
-  ['help', 'Help', 'مساعدة'],
-  ['pain', 'Pain', 'ألم'],
-  ['bathroom', 'Bathroom', 'حمام'],
-  ['yes', 'Yes', 'نعم'],
-  ['no', 'No', 'لا'],
-  ['thankyou', 'Thank You', 'شكراً'],
-  ['wait', 'Wait', 'انتظر'],
-  ['doctor', 'Doctor', 'طبيب'],
-  // Everyday conversational phrases -- added so Conversation mode can send
-  // a whole common phrase as ONE sign instead of fingerspelling it.
-  ['hello', 'Hello', 'مرحباً'],
-  ['howareyou', 'How Are You', 'كيف حالك'],
-  ['imfine', 'I Am Fine', 'أنا بخير'],
-  ['nicetomeetyou', 'Nice To Meet You', 'تشرفنا'],
-  ['goodbye', 'Goodbye', 'مع السلامة'],
+  ['water', 'Water', 'ماء', 'W'],
+  ['food', 'Food', 'طعام', 'F'],
+  ['help', 'Help', 'مساعدة', 'K'],
+  ['pain', 'Pain', 'ألم', 'P'],
+  ['doctor', 'Doctor', 'طبيب', 'D'],
+  ['medicine', 'Medicine', 'دواء', 'L'],
+  ['bathroom', 'Bathroom', 'حمام', 'B'],
+  ['yes', 'Yes', 'نعم', 'S'],
+  ['no', 'No', 'لا', 'X'],
+  ['thankyou', 'Thank You', 'شكراً', 'G'],
+  ['please', 'Please', 'من فضلك', 'R'],
+  ['sorry', 'Sorry', 'آسف', 'I'],
+  ['wait', 'Wait', 'انتظر', '5'],
+  ['stop', 'Stop', 'توقف', '4'],
+  ['where', 'Where', 'أين', 'V'],
+  ['family', 'Family', 'عائلة', 'C'],
+  ['money', 'Money', 'مال', 'O'],
+  ['phone', 'Phone', 'هاتف', 'Y'],
+  ['tired', 'Tired', 'تعب', '7'],
+  ['emergency', 'Emergency', 'طوارئ', '8'],
 ];
-const NEEDS_CLASSES = NEEDS_RAW.map(([label, en, ar]) => ({ label, displayEn: en, displayAr: ar, tip: null }));
+const NEEDS_CLASSES = NEEDS_RAW.map(([label, en, ar, shape]) => ({
+  label, displayEn: en, displayAr: ar, tip: `Hold the ASL "${shape}" handshape`,
+}));
 
 const ETIQUETTE_RAW = [
   ['heart', 'Hand Over Heart', 'اليد على القلب',
@@ -90,7 +114,7 @@ export const MODES = [
   {
     id: 'needs', key: '3',
     nameEn: 'Essential Needs', nameAr: 'الاحتياجات الأساسية',
-    description: 'A small, easy-to-learn gesture set for urgent needs and everyday conversation.',
+    description: 'One held handshape per word -- ask for water, help or a doctor with a single sign.',
     classes: NEEDS_CLASSES,
   },
   {
