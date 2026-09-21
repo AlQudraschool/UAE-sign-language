@@ -24,8 +24,7 @@ const ASL_CLASSES = [
 // The fourth column exists because of a real bug: we used to hand the bare
 // letter -- "ا" -- straight to the phone's Arabic voice, and text-to-speech
 // engines say nothing at all for a lone letter glyph. On screen you want the
-// letter; out loud you want its NAME ("ألف"). Same reason the digits below
-// speak as words rather than as the numeral "٠".
+// letter; out loud you want its NAME ("ألف").
 const ARABIC_LETTERS = [
   ['alef', 'Alef', 'ا', 'ألف'], ['baa', 'Baa', 'ب', 'باء'], ['taa', 'Taa', 'ت', 'تاء'],
   ['thaa', 'Thaa', 'ث', 'ثاء'], ['jeem', 'Jeem', 'ج', 'جيم'], ['haa', 'Haa', 'ح', 'حاء'],
@@ -38,20 +37,37 @@ const ARABIC_LETTERS = [
   ['noon', 'Noon', 'ن', 'نون'], ['heh', 'Heh', 'ه', 'هاء'], ['waw', 'Waw', 'و', 'واو'],
   ['yaa', 'Yaa', 'ي', 'ياء'],
 ];
-const ARABIC_INDIC_DIGITS = '٠١٢٣٤٥٦٧٨٩'; // U+0660..U+0669, index === digit value
-const ARABIC_DIGIT_WORDS = [
-  'صفر', 'واحد', 'اثنان', 'ثلاثة', 'أربعة', 'خمسة', 'ستة', 'سبعة', 'ثمانية', 'تسعة',
-];
-
-const ARSL_CLASSES = [
-  ...ARABIC_LETTERS.map(([label, en, ar, sayAr]) => ({
-    label, displayEn: en, displayAr: ar, speakAr: sayAr, tip: null,
-  })),
-  ...Array.from({ length: 10 }, (_, d) => ({
-    label: `raqm${d}`, displayEn: String(d), displayAr: ARABIC_INDIC_DIGITS[d],
-    speakAr: ARABIC_DIGIT_WORDS[d], tip: null,
-  })),
-];
+// ---------------------------------------------------------------------------
+// ARABIC NUMERALS ARE DELIBERATELY NOT LISTED HERE.
+//
+// The Arabic model was trained on the AASL dataset, which contains the 28
+// LETTERS only -- there are no numeral photos in it, and we never recorded any
+// ourselves. So the trained model has 28 classes and physically cannot output
+// a numeral.
+//
+// Listing them anyway was an active bug, not a harmless extra: quiz.js picks a
+// target at random from this list, so 10 of 38 targets -- more than a quarter
+// of every round -- were signs the model can never award a point for. A visitor
+// would hold the correct sign until the timer ran out and conclude the app was
+// broken.
+//
+// TO ADD THEM LATER: record data/ARSL/raqm0 ... raqm9 with collect_imgs.py,
+// retrain, reconvert, and then restore the block below.
+//
+//   const ARABIC_INDIC_DIGITS = '٠١٢٣٤٥٦٧٨٩';   // U+0660..U+0669
+//   const ARABIC_DIGIT_WORDS = [
+//     'صفر', 'واحد', 'اثنان', 'ثلاثة', 'أربعة', 'خمسة', 'ستة', 'سبعة', 'ثمانية', 'تسعة',
+//   ];
+//   ...Array.from({ length: 10 }, (_, d) => ({
+//     label: `raqm${d}`, displayEn: String(d), displayAr: ARABIC_INDIC_DIGITS[d],
+//     speakAr: ARABIC_DIGIT_WORDS[d], tip: null,
+//   })),
+//
+// Keep this in step with _ARSL_CLASSES in ../modes.py.
+// ---------------------------------------------------------------------------
+const ARSL_CLASSES = ARABIC_LETTERS.map(([label, en, ar, sayAr]) => ({
+  label, displayEn: en, displayAr: ar, speakAr: sayAr, tip: null,
+}));
 
 // Each word is one held ASL handshape, so a whole word is a single sign
 // instead of being spelled out letter by letter. The fourth column is that
@@ -101,14 +117,14 @@ const ETIQUETTE_CLASSES = ETIQUETTE_RAW.map(([label, en, ar, tip]) => ({ label, 
 export const MODES = [
   {
     id: 'asl', key: '1',
-    nameEn: 'American Sign Language', nameAr: 'لغة الإشارة الأمريكية',
+    nameEn: 'English Sign Language', nameAr: 'لغة الإشارة الإنجليزية',
     description: 'Fingerspelled ASL alphabet (A-Z) and digits (0-9).',
     classes: ASL_CLASSES,
   },
   {
     id: 'arsl', key: '2',
     nameEn: 'Arabic Sign Language', nameAr: 'لغة الإشارة العربية',
-    description: 'Arabic manual alphabet (28 letters) and Arabic-Indic numerals (0-9).',
+    description: 'Arabic manual alphabet -- all 28 letters.',
     classes: ARSL_CLASSES,
   },
   {
