@@ -11,7 +11,7 @@
  * converted) will keep working offline after that first visit.
  */
 
-const CACHE_NAME = 'uae-sign-language-v8';
+const CACHE_NAME = 'uae-sign-language-v9';
 const APP_SHELL = [
   './',
   './index.html',
